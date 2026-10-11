@@ -163,6 +163,20 @@ describe('server production (Bun + Nitro preset bun)', () => {
     expect(setCookie).toContain('SameSite=Lax')
   })
 
+  test('harness QA visual tidak ada di build production: 404 dan tidak masuk manifest/chunk', async () => {
+    for (const path of ['/__office-visual-qa', '/__dev/office-visual-qa']) {
+      const response = await fetch(`${base}${path}`)
+      expect(response.status).toBe(404)
+    }
+    const files = await Array.fromAsync(new Bun.Glob('**/*.{js,mjs,json}').scan({ cwd: '.output', onlyFiles: true }))
+    expect(files.length).toBeGreaterThan(0)
+    const leaked: string[] = []
+    for (const file of files) {
+      if ((await Bun.file(`.output/${file}`).text()).includes('office-visual-qa')) leaked.push(file)
+    }
+    expect(leaked).toEqual([])
+  })
+
   test('halaman terlindungi mengarahkan pengguna anonim ke /login', async () => {
     const response = await fetch(`${base}/office`, { redirect: 'manual' })
     expect(response.status).toBe(302)
@@ -216,5 +230,67 @@ describe('server production (Bun + Nitro preset bun)', () => {
   test('SSE ditolak tanpa sesi', async () => {
     const response = await fetch(`${base}/api/v1/realtime/stream`)
     expect(response.status).toBe(401)
+  })
+})
+
+describe('server production dengan database tidak terjangkau (gerbang kesiapan mode mount)', () => {
+  let degraded: Subprocess | undefined
+  let degradedBase = ''
+
+  beforeAll(async () => {
+    const port = await freePort()
+    degradedBase = `http://127.0.0.1:${port}`
+    degraded = Bun.spawn(['bun', SERVER_ENTRY], {
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        PORT: String(port),
+        HOST: '127.0.0.1',
+        DATABASE_URL: 'postgresql://nobody:nobody@127.0.0.1:1/nowhere',
+        DATABASE_CONNECT_TIMEOUT_SECONDS: '2',
+        SESSION_SECRET: TEST_SESSION_SECRET,
+      },
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const deadline = Date.now() + 30_000
+    while (Date.now() < deadline) {
+      try {
+        await fetch(`${degradedBase}/api/v1/health`)
+        return
+      } catch {
+        await Bun.sleep(25)
+      }
+    }
+    throw new Error('Server degraded tidak membuka port')
+  }, 60_000)
+
+  afterAll(async () => {
+    degraded?.kill()
+    await degraded?.exited
+  })
+
+  test('health 503 "unavailable"; API tenant 503 DATABASE_UNAVAILABLE (fail-closed, bukan 500/hang)', async () => {
+    const health = await fetch(`${degradedBase}/api/v1/health`)
+    expect(health.status).toBe(503)
+    expect(await health.json()).toMatchObject({ status: 'degraded', checks: { database: 'unavailable' } })
+
+    const agents = await fetch(`${degradedBase}/api/v1/agents`)
+    expect(agents.status).toBe(503)
+    expect(await agents.json()).toMatchObject({ code: 'DATABASE_UNAVAILABLE' })
+    expect(agents.headers.get('retry-after')).toBeTruthy()
+
+    const login = await fetch(`${degradedBase}/api/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: degradedBase },
+      body: JSON.stringify({ email: 'x@test.local', password: 'correct-horse-battery-staple' }),
+    })
+    expect(login.status).toBe(503)
+  })
+
+  test('halaman publik tetap dirender (SSR) walau database tidak tersedia', async () => {
+    const response = await fetch(`${degradedBase}/login`)
+    expect(response.status).toBe(200)
+    expect(await response.text()).toContain('<html')
   })
 })

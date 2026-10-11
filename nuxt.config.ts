@@ -1,11 +1,31 @@
+import { fileURLToPath } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
+import type { NuxtModule } from 'nuxt/schema'
+
+/**
+ * Halaman harness khusus pengembangan (kalibrasi visual dunia /office).
+ * Hanya didaftarkan saat `nuxt dev` (`nuxt.options.dev`); pada `nuxt build`
+ * hook ini tidak dipasang sehingga halaman tidak pernah ada di manifest route
+ * production (diverifikasi tests/e2e/production.test.ts). File halamannya
+ * sengaja di luar app/pages agar tidak dipindai sebagai route biasa.
+ */
+const devOnlyPages: NuxtModule = (_options, nuxt) => {
+  if (!nuxt.options.dev) return
+  nuxt.hook('pages:extend', (pages) => {
+    pages.push({
+      name: 'dev-office-visual-qa',
+      path: '/__dev/office-visual-qa',
+      file: fileURLToPath(new URL('./app/dev/office-visual-qa.vue', import.meta.url)),
+    })
+  })
+}
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
 
-  modules: ['nuxt-elysia', 'shadcn-nuxt', '@nuxtjs/color-mode', '@nuxt/eslint'],
+  modules: ['nuxt-elysia', 'shadcn-nuxt', '@nuxtjs/color-mode', '@nuxt/eslint', devOnlyPages],
 
   css: ['~/assets/css/tailwind.css', 'vue-sonner/style.css'],
 

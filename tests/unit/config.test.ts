@@ -13,6 +13,9 @@ describe('loadApiConfig', () => {
     expect(config.session.cookieSecure).toBe(false)
     expect(config.session.cookieName).toBe('aivo_session')
     expect(config.database.poolMax).toBe(10)
+    expect(config.standalone.port).toBe(4000)
+    expect(loadApiConfig({ ...BASE, API_STANDALONE_PORT: '4123' }).standalone.port).toBe(4123)
+    expect(() => loadApiConfig({ ...BASE, API_STANDALONE_PORT: '70000' })).toThrow(/API_STANDALONE_PORT/)
   })
 
   test('production memaksa cookie Secure dengan prefix __Host-', () => {

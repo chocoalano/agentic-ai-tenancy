@@ -35,6 +35,10 @@ export interface ApiConfig {
   realtime: {
     heartbeatIntervalMs: number
   }
+  standalone: {
+    /** Port server Bun/Elysia mandiri (`bun run api:standalone`). */
+    port: number
+  }
 }
 
 export class ConfigError extends Error {
@@ -138,6 +142,9 @@ export function loadApiConfig(env: Env = process.env): ApiConfig {
     },
     realtime: {
       heartbeatIntervalMs: readInt(env, 'REALTIME_HEARTBEAT_MS', 5_000, 1_000, 120_000, issues),
+    },
+    standalone: {
+      port: readInt(env, 'API_STANDALONE_PORT', 4000, 1, 65535, issues),
     },
   }
 

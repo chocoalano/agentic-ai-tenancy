@@ -7,6 +7,15 @@ import { checkCrossOrigin } from '../security/cross-origin'
 import type { Logger } from './logger'
 import { requestIdOf } from './request-context'
 
+/**
+ * Endpoint yang tidak menyentuh data tenant dan harus tetap menjawab saat
+ * gerbang kesiapan tertutup: health (melaporkan state gerbang) dan dokumentasi
+ * OpenAPI. Dicocokkan dari akhir path agar tidak bergantung pada prefix mount.
+ */
+export function isReadinessExempt(pathname: string): boolean {
+  return pathname.endsWith('/v1/health') || /\/openapi(\/|$)/.test(pathname)
+}
+
 function body(error: AppError, requestId: string): ApiErrorBody {
   return error.details === undefined
     ? { code: error.code, message: error.message, requestId }
@@ -19,6 +28,7 @@ function body(error: AppError, requestId: string): ApiErrorBody {
  * - header keamanan dan `Cache-Control: no-store` (respons API dapat berisi
  *   data tenant privat dan tidak boleh disimpan cache bersama),
  * - proteksi CSRF berbasis Fetch Metadata/Origin untuk metode mutasi,
+ * - gerbang kesiapan database (fail-closed) sebelum handler mana pun berjalan,
  * - normalisasi semua error menjadi `ApiError`.
  */
 export function httpPlugin(deps: { config: ApiConfig; logger: Logger; waitUntilReady?: () => Promise<void> }) {
@@ -35,7 +45,7 @@ export function httpPlugin(deps: { config: ApiConfig; logger: Logger; waitUntilR
         deps.logger.warn('Request lintas origin ditolak', { requestId, reason: verdict.reason, method: request.method })
         throw new AppError(403, 'CROSS_ORIGIN_REQUEST_BLOCKED', 'Request lintas origin tidak diizinkan.')
       }
-      await deps.waitUntilReady?.()
+      if (deps.waitUntilReady && !isReadinessExempt(new URL(request.url).pathname)) await deps.waitUntilReady()
     })
     .onError({ as: 'global' }, ({ code, error, request, set }) => {
       const requestId = requestIdOf(request)
@@ -43,7 +53,11 @@ export function httpPlugin(deps: { config: ApiConfig; logger: Logger; waitUntilR
       set.headers['cache-control'] = 'no-store'
 
       if (error instanceof AppError) {
-        if (error.status === 429 && typeof error.details === 'object' && error.details !== null) {
+        if (
+          (error.status === 429 || error.status === 503) &&
+          typeof error.details === 'object' &&
+          error.details !== null
+        ) {
           const retry = 'retryAfterSeconds' in error.details ? error.details.retryAfterSeconds : undefined
           if (typeof retry === 'number') set.headers['retry-after'] = String(retry)
         }

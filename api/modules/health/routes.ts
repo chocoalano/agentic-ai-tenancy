@@ -1,7 +1,5 @@
-import type { SQL } from 'bun'
 import { Elysia, t } from 'elysia'
-import { describeRuntimeRoleProblems, inspectRuntimeRole } from '../../core/database/safety'
-import type { Logger } from '../../core/http/logger'
+import type { ReadinessGate } from '../../core/database/readiness'
 
 const HealthSchema = t.Object(
   {
@@ -14,38 +12,22 @@ const HealthSchema = t.Object(
   { title: 'Health' },
 )
 
-const ROLE_CHECK_TTL_MS = 60_000
+/** Health boleh memicu verifikasi ulang paling cepat setiap 5 detik (endpoint publik). */
+const HEALTH_MAX_AGE_MS = 5_000
 
 /**
- * Health check publik. Hanya mengembalikan status ringkas — tanpa versi,
- * host, nama database, atau pesan error — agar tidak membocorkan detail
- * infrastruktur.
+ * Health check publik: mencerminkan state gerbang kesiapan (konektivitas +
+ * keamanan role/RLS). Hanya mengembalikan status ringkas — tanpa versi, host,
+ * nama database, atau pesan error — agar tidak membocorkan detail infrastruktur.
+ * Endpoint ini sendiri tidak ditahan gerbang (lihat http-plugin).
  */
-export function healthRoutes(deps: { sql: SQL; logger: Logger }) {
-  let roleCheck: { ok: boolean; checkedAt: number } | undefined
-
-  async function databaseStatus(): Promise<'ok' | 'unavailable' | 'misconfigured'> {
-    try {
-      await deps.sql`select 1`
-    } catch {
-      return 'unavailable'
-    }
-    if (!roleCheck || Date.now() - roleCheck.checkedAt > ROLE_CHECK_TTL_MS) {
-      try {
-        const problems = describeRuntimeRoleProblems(await inspectRuntimeRole(deps.sql))
-        if (problems.length > 0) deps.logger.error('Role database runtime tidak aman', { problems })
-        roleCheck = { ok: problems.length === 0, checkedAt: Date.now() }
-      } catch {
-        return 'unavailable'
-      }
-    }
-    return roleCheck.ok ? 'ok' : 'misconfigured'
-  }
-
+export function healthRoutes(deps: { readiness: ReadinessGate }) {
   return new Elysia({ prefix: '/health', tags: ['System'] }).get(
     '',
     async ({ status }) => {
-      const database = await databaseStatus()
+      const state = await deps.readiness.verify({ maxAgeMs: HEALTH_MAX_AGE_MS })
+      const database: 'ok' | 'unavailable' | 'misconfigured' =
+        state.status === 'ready' ? 'ok' : state.status === 'misconfigured' ? 'misconfigured' : 'unavailable'
       const result = {
         status: database === 'ok' ? ('ok' as const) : ('degraded' as const),
         time: new Date(),
@@ -57,7 +39,9 @@ export function healthRoutes(deps: { sql: SQL; logger: Logger }) {
       response: { 200: HealthSchema, 503: HealthSchema },
       detail: {
         summary: 'Health check',
-        description: 'Status layanan dan konektivitas database. Mengembalikan 503 bila database tidak siap.',
+        description:
+          'Status layanan: konektivitas database dan verifikasi keamanan role/RLS. ' +
+          'Mengembalikan 503 bila database tidak siap atau konfigurasinya tidak aman.',
       },
     },
   )

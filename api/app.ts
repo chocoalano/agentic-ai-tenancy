@@ -1,6 +1,7 @@
 import { openapi } from '@elysia/openapi'
 import { Elysia } from 'elysia'
 import type { ApiDependencies } from './container'
+import { createReadinessGate, type ReadinessGate } from './core/database/readiness'
 import { httpPlugin } from './core/http/http-plugin'
 import { agentRoutes } from './modules/agents/routes'
 import { authRoutes } from './modules/auth/routes'
@@ -29,12 +30,14 @@ dalam transaksi dengan konteks RLS PostgreSQL.
  * tidak memanggil `.listen()`, sehingga dapat di-mount oleh nuxt-elysia
  * (lihat `api/index.ts`) maupun dijalankan mandiri (lihat `api/standalone.ts`).
  */
-export function createApi(deps: ApiDependencies, options: { waitUntilReady?: () => Promise<void> } = {}) {
+export function createApi(deps: ApiDependencies, options: { readiness?: ReadinessGate } = {}) {
   const { config, services } = deps
   const guarded = { config, auth: services.auth }
+  // Gerbang kesiapan dibuat sekali per aplikasi; verifikasi pertama dimulai di sini.
+  const readiness = options.readiness ?? createReadinessGate(deps)
 
   const v1 = new Elysia({ prefix: '/v1' })
-    .use(healthRoutes(deps))
+    .use(healthRoutes({ readiness }))
     .use(authRoutes(guarded))
     .use(tenantRoutes({ ...guarded, tenants: services.tenants, memberships: services.memberships }))
     .use(membershipRoutes({ ...guarded, memberships: services.memberships }))
@@ -42,7 +45,7 @@ export function createApi(deps: ApiDependencies, options: { waitUntilReady?: () 
     .use(realtimeRoutes(guarded))
 
   return new Elysia()
-    .use(httpPlugin({ ...deps, waitUntilReady: options.waitUntilReady }))
+    .use(httpPlugin({ ...deps, waitUntilReady: readiness.waitUntilReady }))
     .use(
       openapi({
         enabled: config.openapi.enabled,

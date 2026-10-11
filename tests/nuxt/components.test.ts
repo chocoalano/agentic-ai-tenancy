@@ -205,13 +205,23 @@ describe('Virtual Office memakai aset game asli', () => {
     expect(wrapper.emitted('togglePreview')).toHaveLength(1)
   })
 
-  it('roster pratinjau menandai karakter contoh dan jumlah nyata', async () => {
-    const wrapper = await mountSuspended(AgentRoster, {
-      props: { entries: previewRoster(), preview: true, realCount: 0, activeCount: 0, selection: null },
+  it('roster pratinjau menandai karakter contoh sebagai SIMULASI, berbeda dari roster live', async () => {
+    const entries = previewRoster()
+    const preview = await mountSuspended(AgentRoster, {
+      props: { entries, preview: true, realCount: 0, activeCount: 0, selection: null },
     })
-    expect(wrapper.text()).toContain('PRATINJAU')
-    expect(wrapper.text()).toContain('nyata: 0')
-    expect(wrapper.text()).toContain('Nova')
+    // Label pembeda wajib ada: karakter contoh, bukan AI employee nyata.
+    expect(preview.text()).toContain('SIMULASI')
+    expect(preview.text()).toContain('Karakter contoh')
+    expect(preview.text()).toContain(`${entries.length} / ${entries.length}`)
+    expect(preview.text()).toContain('Nova')
+
+    const live = await mountSuspended(AgentRoster, {
+      props: { entries: [], preview: false, realCount: 0, activeCount: 0, selection: null },
+    })
+    expect(live.text()).not.toContain('SIMULASI')
+    expect(live.text()).toContain('AI employee direkrut')
+    expect(live.text()).toContain('bukan agent nyata')
   })
 
   it('panel perintah pratinjau: permintaan persetujuan menampilkan kontrol simulasi (live: tidak)', async () => {
