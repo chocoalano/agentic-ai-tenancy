@@ -1,0 +1,5 @@
+[test]
+# Menyiapkan database test (migrasi) bila TEST_DATABASE_MIGRATION_URL tersedia.
+preload = ["./tests/helpers/preload.ts"]
+# Test integrasi/keamanan melibatkan Argon2 dan PostgreSQL.
+timeout = 30000

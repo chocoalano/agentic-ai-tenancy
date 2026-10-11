@@ -1,0 +1,22 @@
+{
+  // Typecheck backend sebagai kode Bun mandiri (tanpa alias/auto-import Nuxt).
+  // Menjamin api/, domains/, db/, scripts/, dan tests/ backend dapat diekstrak
+  // menjadi layanan Bun/Elysia terpisah.
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext"],
+    "types": ["bun"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["api/**/*.ts", "domains/**/*.ts", "db/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", ".nuxt", ".output", "tests/nuxt/**"]
+}

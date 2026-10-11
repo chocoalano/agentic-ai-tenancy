@@ -1,0 +1,452 @@
+/*
+ * Primitive visual Virtual Office bergaya game (asset pack "Neon Mission Map").
+ *
+ * Artwork utama (pulau, robot, kota, efek) adalah PNG asli dari
+ * public/game-assets — file ini hanya menyediakan bingkai, panel HUD, tombol,
+ * dan animasi di sekitar artwork tersebut. Warna dari token `--office-*`
+ * (tailwind.css). Animasi hanya transform/opacity/stroke-dashoffset dan
+ * dimatikan oleh prefers-reduced-motion (aturan global di tailwind.css +
+ * varian `motion-safe:` pada komponen).
+ */
+
+/* Bingkai game: langit malam navy dengan cahaya horizon ungu & cyan. */
+@utility office-frame {
+  background-color: var(--office-bg);
+  background-image:
+    radial-gradient(60% 45% at 50% 0%, color-mix(in oklch, var(--office-purple) 26%, transparent), transparent 75%),
+    radial-gradient(50% 40% at 85% 100%, color-mix(in oklch, var(--office-cyan) 12%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 10% 90%, color-mix(in oklch, var(--office-blue) 16%, transparent), transparent 70%),
+    linear-gradient(180deg, oklch(0.16 0.05 275), var(--office-bg) 45%, oklch(0.15 0.04 262));
+}
+
+/* Bintang halus (tidak ada aset bintang di pack). */
+@utility office-stars {
+  background-image:
+    radial-gradient(1px 1px at 8% 14%, oklch(1 0 0 / 70%), transparent 60%),
+    radial-gradient(1px 1px at 21% 6%, oklch(1 0 0 / 50%), transparent 60%),
+    radial-gradient(1.5px 1.5px at 37% 18%, oklch(1 0 0 / 55%), transparent 60%),
+    radial-gradient(1px 1px at 52% 9%, oklch(1 0 0 / 45%), transparent 60%),
+    radial-gradient(1px 1px at 66% 21%, oklch(1 0 0 / 60%), transparent 60%),
+    radial-gradient(1.5px 1.5px at 81% 7%, oklch(1 0 0 / 50%), transparent 60%),
+    radial-gradient(1px 1px at 93% 16%, oklch(1 0 0 / 65%), transparent 60%);
+}
+
+/* Panel HUD (neon-tokens.css `.office-panel`). */
+@utility office-panel {
+  background-image: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--office-surface) 94%, transparent),
+    color-mix(in oklch, var(--office-panel) 94%, transparent)
+  );
+  border: 1px solid color-mix(in oklch, var(--office-border) 70%, transparent);
+  box-shadow:
+    0 10px 28px oklch(0.12 0.05 262 / 45%),
+    inset 0 1px 0 color-mix(in oklch, var(--office-cyan) 15%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Sumur di dalam panel (track progres, kartu roster). */
+@utility office-well {
+  background-color: color-mix(in oklch, var(--office-bg) 70%, transparent);
+  border: 1px solid color-mix(in oklch, var(--office-border) 40%, transparent);
+}
+
+/* Papan nama pulau & label agent di panggung. */
+@utility office-plate {
+  background-color: color-mix(in oklch, var(--office-bg) 82%, transparent);
+  border: 1px solid color-mix(in oklch, var(--office-cyan) 30%, transparent);
+  box-shadow: 0 4px 12px oklch(0.1 0.05 262 / 55%);
+}
+
+/* Isi progres: cyan → biru (XP/progres di asset pack). */
+@utility office-bar {
+  background-image: linear-gradient(90deg, var(--office-cyan), var(--office-blue));
+  box-shadow: 0 0 10px color-mix(in oklch, var(--office-cyan) 45%, transparent);
+}
+
+@utility office-bar-mint {
+  background-image: linear-gradient(90deg, var(--office-mint), var(--office-cyan));
+  box-shadow: 0 0 10px color-mix(in oklch, var(--office-mint) 40%, transparent);
+}
+
+/*
+ * Efek FX dari pack tidak memiliki alpha lembut (latar gelap ikut opak).
+ * Mask luminans membuat piksel gelap transparan dan cahaya tetap terang,
+ * tanpa mengubah file aset. URL gambar diberikan lewat gaya inline.
+ */
+@utility fx-luminance {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  mask-mode: luminance;
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+}
+
+/* Tombol aksi game (ui-previews/action-buttons). */
+@utility game-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in oklch, var(--office-cyan) 30%, transparent);
+  color: oklch(0.98 0.01 250);
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 18%),
+    0 6px 18px oklch(0.1 0.05 262 / 45%);
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+
+  &:hover:not([aria-disabled='true']) {
+    filter: brightness(1.12);
+  }
+
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    filter: saturate(0.55) brightness(0.8);
+  }
+}
+
+@utility game-btn-blue {
+  background-image: linear-gradient(180deg, oklch(0.66 0.2 255), oklch(0.5 0.21 262));
+}
+
+@utility game-btn-green {
+  background-image: linear-gradient(180deg, oklch(0.72 0.19 150), oklch(0.56 0.17 152));
+}
+
+@utility game-btn-purple {
+  background-image: linear-gradient(180deg, oklch(0.6 0.25 298), oklch(0.47 0.24 292));
+}
+
+@utility game-btn-navy {
+  background-image: linear-gradient(180deg, oklch(0.36 0.1 258), oklch(0.26 0.08 262));
+}
+
+/* Tepi lembut sel scene agar pulau saat zoom tidak terpotong tajam. */
+@utility office-scene-mask {
+  mask-image:
+    linear-gradient(90deg, transparent, black 1.5rem, black calc(100% - 1.5rem), transparent),
+    linear-gradient(180deg, transparent, black 1.5rem, black calc(100% - 1.5rem), transparent);
+  mask-composite: intersect;
+}
+
+@keyframes office-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4%);
+  }
+}
+
+@keyframes office-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes office-drift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(6%);
+  }
+}
+
+@keyframes office-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes office-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes office-flow {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+@utility animate-office-float {
+  animation: office-float var(--office-duration, 9s) ease-in-out infinite;
+}
+
+@utility animate-office-bob {
+  animation: office-bob 3.2s ease-in-out infinite;
+}
+
+@utility animate-office-drift {
+  animation: office-drift var(--office-duration, 40s) ease-in-out infinite;
+}
+
+@utility animate-office-pulse {
+  animation: office-pulse 4s ease-in-out infinite;
+}
+
+@utility animate-office-twinkle {
+  animation: office-twinkle 3.6s ease-in-out infinite;
+}
+
+@utility animate-office-flow {
+  animation: office-flow 1.8s linear infinite;
+}
+
+/* ================================================================== *
+ * Mode game layar penuh (/office) — kamera dunia, langit, HUD, command bar
+ * ================================================================== */
+
+/*
+ * Kamera dunia. `--s` = panjang satu unit dunia (dunia 1672 × 941 unit).
+ * Dihitung CSS dari ukuran viewport game (container query units), sehingga
+ * SSR dan browser menghasilkan markup identik — tanpa pengukuran JS.
+ * Didaftarkan sebagai <length> agar anak mewarisi nilai px final.
+ */
+@property --s {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 1px;
+}
+
+.game-viewport {
+  container: game / size;
+  touch-action: none;
+}
+
+.game-stage {
+  /* HUD melayang di atas komposisi penuh, seperti referensi 1672 × 941. */
+  --s: min(calc(100cqw / 1672), calc(100cqh / 941));
+  position: absolute;
+  width: calc(var(--s) * 1672);
+  height: calc(var(--s) * 941);
+  left: calc(50% - var(--s) * 836);
+  top: calc(50% - var(--s) * 470.5);
+  transform-origin: 50% 50%;
+}
+
+/* Potret (tablet/ponsel tegak): dunia lebih besar dari lebar layar, digeser dengan seret. */
+@container game (orientation: portrait) {
+  .game-stage {
+    --s: min(
+      calc((100cqh - var(--hud-top) - var(--hud-bottom)) / 875),
+      calc(100cqw / 1672 * var(--portrait-zoom, 1.6))
+    );
+    top: calc(var(--hud-top) + (100cqh - var(--hud-top) - var(--hud-bottom) - var(--s) * 941) / 2);
+  }
+}
+
+/* Langit senja futuristik (palet lukisan backgrounds/city-skyline.png). */
+@utility game-sky {
+  background-color: oklch(0.2 0.09 275);
+  background-image:
+    radial-gradient(55% 38% at 50% 46%, oklch(0.72 0.14 220 / 30%), transparent 72%),
+    radial-gradient(70% 34% at 18% 78%, oklch(0.68 0.19 340 / 42%), transparent 70%),
+    radial-gradient(70% 34% at 84% 74%, oklch(0.74 0.15 30 / 34%), transparent 70%),
+    radial-gradient(60% 40% at 50% 0%, oklch(0.42 0.2 285 / 60%), transparent 70%),
+    linear-gradient(
+      180deg,
+      oklch(0.16 0.08 270) 0%,
+      oklch(0.27 0.13 268) 28%,
+      oklch(0.38 0.16 285) 52%,
+      oklch(0.55 0.18 320) 74%,
+      oklch(0.68 0.15 15) 100%
+    );
+}
+
+/* Vinyet tepi agar HUD tetap kontras di atas dunia berwarna. */
+@utility game-vignette {
+  background-image:
+    linear-gradient(180deg, oklch(0.12 0.06 270 / 70%), transparent 14%, transparent 80%, oklch(0.12 0.06 270 / 75%)),
+    radial-gradient(120% 90% at 50% 50%, transparent 55%, oklch(0.1 0.05 270 / 55%));
+}
+
+/* Panel HUD game: navy tembus pandang, garis cyan bercahaya, aksen sudut. */
+@utility hud-panel {
+  position: relative;
+  border-radius: 1rem;
+  background-image:
+    linear-gradient(160deg, oklch(0.3 0.09 262 / 88%), oklch(0.17 0.06 266 / 90%) 60%),
+    radial-gradient(120% 60% at 0% 0%, oklch(0.8 0.14 215 / 14%), transparent 60%);
+  border: 2px solid color-mix(in oklch, var(--office-border) 65%, white);
+  box-shadow:
+    0 0 0 1px oklch(0.2 0.08 265 / 70%),
+    0 0 12px oklch(0.6 0.15 250 / 18%),
+    inset 0 1px 0 oklch(0.95 0.06 210 / 18%),
+    0 18px 40px oklch(0.08 0.05 270 / 55%);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    border-color: color-mix(in oklch, var(--office-border) 60%, white);
+  }
+
+  &::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+    border-top-left-radius: 1rem;
+  }
+
+  &::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 2px solid;
+    border-right: 2px solid;
+    border-bottom-right-radius: 1rem;
+  }
+}
+
+/* Segmen di dalam HUD atas. */
+@utility hud-segment {
+  border-radius: 0.75rem;
+  background-image: linear-gradient(180deg, oklch(0.32 0.1 262 / 70%), oklch(0.2 0.07 266 / 70%));
+  border: 1px solid oklch(0.7 0.13 230 / 30%);
+  box-shadow: inset 0 1px 0 oklch(0.95 0.06 210 / 12%);
+}
+
+/* Bar progres bercahaya di HUD. */
+@utility hud-track {
+  background-color: oklch(0.14 0.05 266 / 85%);
+  border: 1px solid oklch(0.7 0.12 230 / 25%);
+}
+
+/* Label kecil "DEMO" untuk nilai contoh mode pratinjau. */
+@utility demo-tag {
+  border-radius: 0.3rem;
+  padding: 0.05rem 0.3rem;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: oklch(0.2 0.05 70);
+  background-color: var(--office-orange);
+}
+
+/* Tombol command bar besar (ui-previews/action-buttons). */
+@utility cmd-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  border-radius: 0.9rem;
+  border: 1px solid oklch(0.95 0.06 210 / 28%);
+  color: oklch(0.99 0.01 250);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 2px oklch(0.1 0.05 265 / 60%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 30%),
+    inset 0 -3px 0 oklch(0.1 0.05 265 / 35%),
+    0 8px 22px oklch(0.08 0.05 265 / 55%);
+  transition:
+    transform 120ms ease,
+    filter 150ms ease,
+    box-shadow 150ms ease;
+
+  &:hover {
+    filter: brightness(1.12) saturate(1.05);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 20%),
+      inset 0 2px 6px oklch(0.1 0.05 265 / 45%);
+  }
+
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    filter: saturate(0.7) brightness(0.88);
+  }
+
+  &[aria-disabled='true']:hover {
+    transform: none;
+    filter: saturate(0.85) brightness(0.95);
+  }
+}
+
+@utility cmd-key {
+  border-radius: 0.3rem;
+  border: 1px solid oklch(1 0 0 / 35%);
+  background-color: oklch(0.1 0.05 265 / 35%);
+  padding: 0 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.1rem;
+}
+
+@keyframes energy-pulse {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes cloud-pan {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(var(--cloud-shift, 4%));
+  }
+}
+
+@utility animate-energy-pulse {
+  animation: energy-pulse var(--pulse-duration, 3.2s) linear infinite;
+}
+
+@utility animate-glow-breathe {
+  animation: glow-breathe 5s ease-in-out infinite;
+}
+
+@utility animate-cloud-pan {
+  animation: cloud-pan var(--office-duration, 60s) ease-in-out infinite;
+}

@@ -1,0 +1,13 @@
+.nuxt
+.output
+.data
+.scratch
+node_modules
+coverage
+bun.lock
+# Komponen shadcn-vue hasil generate CLI dibiarkan sesuai upstream agar mudah diperbarui.
+app/components/ui
+# Asset pack mentah (sumber render ulang), dibiarkan sesuai aslinya.
+design
+# Aset & manifest asli dari asset pack (dibiarkan identik dengan sumbernya).
+public/game-assets

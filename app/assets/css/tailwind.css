@@ -1,0 +1,514 @@
+/*
+ * Design system Agentic AI Virtual Office — lihat docs/frontend-design-system.md.
+ *
+ * Lapisan token:
+ * 1. Token bawaan shadcn-vue (background, card, primary, ...) — nama tidak
+ *    diubah agar primitive shadcn-vue tetap bekerja.
+ * 2. Token proyek: permukaan (surface-*), brand (blue/cyan/violet/amber),
+ *    status semantik, status agent, gamifikasi (xp/level/mission), dan
+ *    palet game Virtual Office (office-*, dari asset pack Neon Mission Map).
+ * 3. Utilitas: tipografi (type-*), permukaan (surface-panel, glass, ...),
+ *    dan latar (app-backdrop, holo-*). Komponen memakai utilitas & token ini,
+ *    bukan warna hardcoded.
+ *
+ * Tema gelap premium adalah default (kelas `.dark` dari @nuxtjs/color-mode).
+ * Font di-host sendiri via @fontsource (tanpa request eksternal saat runtime).
+ */
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/space-grotesk';
+
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import './office-scene.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-heading: 'Space Grotesk Variable', var(--font-sans);
+
+  /* shadcn-vue */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Proyek: permukaan */
+  --color-surface: var(--surface);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-glass-border: var(--glass-border);
+  --color-hairline: var(--hairline);
+
+  /* Proyek: brand */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-brand-violet: var(--brand-violet);
+  --color-brand-amber: var(--brand-amber);
+
+  /* Proyek: status semantik */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+
+  /* Proyek: status agent */
+  --color-agent-idle: var(--agent-idle);
+  --color-agent-working: var(--agent-working);
+  --color-agent-thinking: var(--agent-thinking);
+  --color-agent-tool: var(--agent-tool);
+  --color-agent-approval: var(--agent-approval);
+  --color-agent-failed: var(--agent-failed);
+  --color-agent-offline: var(--agent-offline);
+
+  /* Proyek: gamifikasi */
+  --color-xp: var(--xp);
+  --color-xp-track: var(--xp-track);
+  --color-level: var(--level);
+  --color-level-foreground: var(--level-foreground);
+  --color-mission: var(--mission);
+
+  /* Proyek: palet game Virtual Office (asset pack "Neon Mission Map") */
+  --color-office-bg: var(--office-bg);
+  --color-office-surface: var(--office-surface);
+  --color-office-panel: var(--office-panel);
+  --color-office-border: var(--office-border);
+  --color-office-cyan: var(--office-cyan);
+  --color-office-blue: var(--office-blue);
+  --color-office-purple: var(--office-purple);
+  --color-office-mint: var(--office-mint);
+  --color-office-orange: var(--office-orange);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* Tema terang (opsional). Bingkai game Virtual Office tetap memakai tema gelap. */
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.975 0.006 255);
+  --foreground: oklch(0.2 0.035 264);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.035 264);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.035 264);
+  --primary: oklch(0.52 0.2 260);
+  --primary-foreground: oklch(0.985 0.004 255);
+  --secondary: oklch(0.95 0.013 255);
+  --secondary-foreground: oklch(0.27 0.04 264);
+  --muted: oklch(0.95 0.01 255);
+  --muted-foreground: oklch(0.48 0.03 260);
+  --accent: oklch(0.935 0.022 250);
+  --accent-foreground: oklch(0.27 0.04 264);
+  --destructive: oklch(0.55 0.22 25);
+  --border: oklch(0.89 0.016 255);
+  --input: oklch(0.89 0.016 255);
+  --ring: oklch(0.58 0.17 245);
+
+  --chart-1: oklch(0.55 0.2 260);
+  --chart-2: oklch(0.6 0.12 210);
+  --chart-3: oklch(0.55 0.17 295);
+  --chart-4: oklch(0.68 0.16 60);
+  --chart-5: oklch(0.6 0.14 160);
+
+  --sidebar: oklch(0.96 0.01 255);
+  --sidebar-foreground: oklch(0.25 0.035 264);
+  --sidebar-primary: oklch(0.52 0.2 260);
+  --sidebar-primary-foreground: oklch(0.985 0.004 255);
+  --sidebar-accent: oklch(0.92 0.025 252);
+  --sidebar-accent-foreground: oklch(0.22 0.04 264);
+  --sidebar-border: oklch(0.89 0.016 255);
+  --sidebar-ring: oklch(0.58 0.17 245);
+
+  --surface: oklch(1 0 0 / 74%);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.99 0.004 255);
+  --surface-sunken: oklch(0.955 0.01 255);
+  --glass-border: oklch(0.55 0.08 255 / 15%);
+  --hairline: oklch(0.55 0.05 255 / 12%);
+  --highlight: oklch(1 0 0 / 80%);
+  --glow: oklch(0.6 0.17 245 / 18%);
+  --grid-line: oklch(0.5 0.05 255 / 6%);
+  --shadow-panel: 0 1px 2px oklch(0.3 0.05 260 / 6%), 0 8px 24px -12px oklch(0.3 0.05 260 / 14%);
+  --shadow-elevated: 0 2px 4px oklch(0.3 0.05 260 / 8%), 0 24px 48px -20px oklch(0.3 0.06 260 / 28%);
+
+  --brand-blue: oklch(0.52 0.2 260);
+  --brand-cyan: oklch(0.6 0.12 215);
+  --brand-violet: oklch(0.52 0.18 295);
+  --brand-amber: oklch(0.66 0.16 62);
+
+  --success: oklch(0.56 0.14 160);
+  --success-foreground: oklch(0.985 0.004 255);
+  --warning: oklch(0.66 0.16 70);
+  --warning-foreground: oklch(0.22 0.04 60);
+  --info: oklch(0.56 0.12 220);
+  --info-foreground: oklch(0.985 0.004 255);
+
+  --agent-idle: oklch(0.52 0.03 260);
+  --agent-working: oklch(0.56 0.14 160);
+  --agent-thinking: oklch(0.53 0.18 295);
+  --agent-tool: oklch(0.56 0.12 215);
+  --agent-approval: oklch(0.64 0.16 58);
+  --agent-failed: oklch(0.55 0.22 25);
+  --agent-offline: oklch(0.62 0.015 260);
+
+  --xp: oklch(0.6 0.13 215);
+  --xp-to: oklch(0.52 0.2 260);
+  --xp-track: oklch(0.92 0.015 255);
+  --level: oklch(0.52 0.18 295);
+  --level-foreground: oklch(0.985 0.004 255);
+  --mission: oklch(0.66 0.16 62);
+
+  /*
+   * Palet game Virtual Office (dari neon-tokens.css asset pack). Sengaja sama
+   * untuk tema terang & gelap: artwork pulau/robot bernuansa malam-neon, dan
+   * bingkai game selalu memakai tema gelap (kelas `.dark` pada bingkai).
+   */
+  --office-bg: oklch(0.19 0.048 261); /* #071329 */
+  --office-surface: oklch(0.265 0.073 260); /* #0e2448 */
+  --office-panel: oklch(0.219 0.06 262); /* #0a1936 */
+  --office-border: oklch(0.467 0.125 255); /* #205a9e */
+  --office-cyan: oklch(0.816 0.141 218); /* #23d8ff */
+  --office-blue: oklch(0.609 0.212 260); /* #267bff */
+  --office-purple: oklch(0.613 0.251 301); /* #a14bff */
+  --office-mint: oklch(0.83 0.163 166); /* #2ee8af */
+  --office-orange: oklch(0.811 0.157 72); /* #ffae36 */
+}
+
+/* Tema gelap premium (default). */
+.dark {
+  --background: oklch(0.145 0.028 266);
+  --foreground: oklch(0.955 0.012 250);
+  --card: oklch(0.185 0.032 265);
+  --card-foreground: oklch(0.955 0.012 250);
+  --popover: oklch(0.19 0.034 265);
+  --popover-foreground: oklch(0.955 0.012 250);
+  --primary: oklch(0.66 0.19 256);
+  --primary-foreground: oklch(0.985 0.004 255);
+  --secondary: oklch(0.245 0.036 264);
+  --secondary-foreground: oklch(0.93 0.012 250);
+  --muted: oklch(0.23 0.032 264);
+  --muted-foreground: oklch(0.72 0.03 255);
+  --accent: oklch(0.27 0.045 262);
+  --accent-foreground: oklch(0.955 0.012 250);
+  --destructive: oklch(0.65 0.2 22);
+  --border: oklch(0.85 0.05 250 / 11%);
+  --input: oklch(0.85 0.05 250 / 15%);
+  --ring: oklch(0.74 0.15 228);
+
+  --chart-1: oklch(0.66 0.19 256);
+  --chart-2: oklch(0.8 0.13 205);
+  --chart-3: oklch(0.65 0.17 295);
+  --chart-4: oklch(0.78 0.16 62);
+  --chart-5: oklch(0.75 0.15 160);
+
+  --sidebar: oklch(0.128 0.026 266);
+  --sidebar-foreground: oklch(0.9 0.014 250);
+  --sidebar-primary: oklch(0.66 0.19 256);
+  --sidebar-primary-foreground: oklch(0.985 0.004 255);
+  --sidebar-accent: oklch(0.22 0.042 263);
+  --sidebar-accent-foreground: oklch(0.97 0.01 250);
+  --sidebar-border: oklch(0.85 0.05 250 / 8%);
+  --sidebar-ring: oklch(0.74 0.15 228);
+
+  --surface: oklch(0.2 0.036 265 / 62%);
+  --surface-1: oklch(0.18 0.031 265);
+  --surface-2: oklch(0.215 0.036 265);
+  --surface-sunken: oklch(0.155 0.028 266);
+  --glass-border: oklch(0.88 0.06 235 / 12%);
+  --hairline: oklch(0.88 0.05 240 / 9%);
+  --highlight: oklch(0.95 0.04 230 / 7%);
+  --glow: oklch(0.7 0.17 240 / 30%);
+  --grid-line: oklch(0.8 0.08 235 / 5%);
+  --shadow-panel: 0 1px 0 oklch(0.95 0.04 230 / 4%) inset, 0 12px 32px -18px oklch(0.05 0.03 265 / 70%);
+  --shadow-elevated: 0 1px 0 oklch(0.95 0.04 230 / 6%) inset, 0 28px 60px -24px oklch(0.03 0.03 265 / 85%);
+
+  --brand-blue: oklch(0.66 0.19 256);
+  --brand-cyan: oklch(0.8 0.13 205);
+  --brand-violet: oklch(0.66 0.17 295);
+  --brand-amber: oklch(0.79 0.155 66);
+
+  --success: oklch(0.76 0.15 160);
+  --success-foreground: oklch(0.2 0.04 160);
+  --warning: oklch(0.82 0.15 78);
+  --warning-foreground: oklch(0.22 0.05 70);
+  --info: oklch(0.8 0.13 205);
+  --info-foreground: oklch(0.2 0.04 220);
+
+  --agent-idle: oklch(0.72 0.03 255);
+  --agent-working: oklch(0.76 0.15 160);
+  --agent-thinking: oklch(0.7 0.17 295);
+  --agent-tool: oklch(0.8 0.13 205);
+  --agent-approval: oklch(0.79 0.155 66);
+  --agent-failed: oklch(0.66 0.2 22);
+  --agent-offline: oklch(0.55 0.02 260);
+
+  --xp: oklch(0.8 0.13 205);
+  --xp-to: oklch(0.66 0.19 256);
+  --xp-track: oklch(0.26 0.035 264);
+  --level: oklch(0.62 0.19 295);
+  --level-foreground: oklch(0.98 0.01 295);
+  --mission: oklch(0.79 0.155 66);
+}
+
+/* ---------------------------------------------------------------- *
+ * Tipografi. Nama berawalan `type-` (bukan `text-`) agar tidak
+ * bertabrakan dengan utilitas warna Tailwind di tailwind-merge.
+ * ---------------------------------------------------------------- */
+@utility type-display {
+  font-family: var(--font-heading);
+  font-size: clamp(2rem, 1.4rem + 2.4vw, 3.5rem);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+@utility type-page-title {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 1.25rem + 0.9vw, 2rem);
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+@utility type-section-title {
+  font-family: var(--font-heading);
+  font-size: 1.0625rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+@utility type-card-title {
+  font-family: var(--font-heading);
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+@utility type-body {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+@utility type-support {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+
+@utility type-metric {
+  font-family: var(--font-heading);
+  font-size: clamp(1.5rem, 1.3rem + 0.6vw, 1.875rem);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-label {
+  font-size: 0.75rem;
+  line-height: 1.3;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+@utility type-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-cyan);
+}
+
+/* ---------------------------------------------------------------- *
+ * Permukaan
+ * ---------------------------------------------------------------- */
+
+/* Latar aplikasi terautentikasi: navy dalam + cahaya ambient sangat halus. */
+@utility app-backdrop {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(70rem 32rem at 85% -12%, color-mix(in oklch, var(--brand-blue) 10%, transparent), transparent 70%),
+    radial-gradient(48rem 26rem at -8% 8%, color-mix(in oklch, var(--brand-violet) 7%, transparent), transparent 70%);
+}
+
+/* Panel utama (kartu, section). Solid, garis tepi tipis, sorotan atas halus. */
+@utility surface-panel {
+  background-color: var(--surface-1);
+  background-image: linear-gradient(180deg, var(--highlight), transparent 5rem);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-panel);
+}
+
+/* Permukaan terangkat (popover kustom, inspector, dialog). */
+@utility surface-elevated {
+  background-color: var(--surface-2);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* Sumur/jalur (track progres, input non-shadcn, area ringkasan). */
+@utility surface-sunken {
+  background-color: var(--surface-sunken);
+  border: 1px solid var(--hairline);
+}
+
+/* Permukaan kaca: hanya untuk overlay di atas scene/latar bergambar. */
+@utility glass {
+  background-color: var(--surface);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+@utility glass-strong {
+  background-color: color-mix(in oklch, var(--surface-2) 88%, transparent);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+/* Grid holografik halus untuk latar area kerja. */
+@utility holo-grid {
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Cahaya latar ambient (biru → violet) untuk halaman publik. */
+@utility holo-aurora {
+  background-image:
+    radial-gradient(60rem 30rem at 10% -10%, color-mix(in oklch, var(--brand-blue) 22%, transparent), transparent 70%),
+    radial-gradient(50rem 26rem at 95% 0%, color-mix(in oklch, var(--brand-violet) 16%, transparent), transparent 70%),
+    radial-gradient(40rem 20rem at 60% 110%, color-mix(in oklch, var(--brand-cyan) 10%, transparent), transparent 70%);
+}
+
+/* Interaksi kartu: garis tepi + cahaya lembut, tanpa neon. */
+@utility holo-glow {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--brand-cyan) 28%, transparent),
+    0 16px 40px -18px var(--glow);
+}
+
+@utility text-gradient-brand {
+  background-image: linear-gradient(100deg, var(--brand-cyan), var(--brand-blue) 45%, var(--brand-violet));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* Item navigasi sidebar: status aktif = sorotan biru lembut + garis aksen cyan. */
+@utility nav-item {
+  position: relative;
+
+  &[data-active='true'] {
+    background-image: linear-gradient(
+      90deg,
+      color-mix(in oklch, var(--primary) 20%, transparent),
+      color-mix(in oklch, var(--primary) 5%, transparent)
+    );
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+
+  &[data-active='true']::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 22%;
+    bottom: 22%;
+    width: 3px;
+    border-radius: 9999px;
+    background-color: var(--brand-cyan);
+  }
+
+  &[data-active='true'] svg {
+    color: var(--brand-cyan);
+  }
+}
+
+/* Isi bar XP/progres (cyan → biru). */
+@utility bar-xp {
+  background-image: linear-gradient(90deg, var(--xp), var(--xp-to));
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  .font-heading {
+    font-family: var(--font-heading);
+    letter-spacing: -0.015em;
+  }
+
+  /* Fokus keyboard selalu terlihat, termasuk elemen non-shadcn. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Hormati preferensi pengguna untuk mengurangi animasi. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
