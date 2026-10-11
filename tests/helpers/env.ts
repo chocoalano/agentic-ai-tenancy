@@ -1,3 +1,4 @@
+import { describeMissingDatabase, resolveDatabaseUrls } from '../../api/core/config/database-env'
 import { loadApiConfig, type ApiConfig } from '../../api/core/config/env'
 
 /** Secret khusus test (bukan secret pengembangan dari .env). */
@@ -11,16 +12,19 @@ export interface TestDatabaseUrls {
 }
 
 /**
- * Test integrasi, keamanan, dan e2e MEMBUTUHKAN PostgreSQL. Variabel
- * TEST_DATABASE_URL dan TEST_DATABASE_MIGRATION_URL wajib diisi (lihat
- * docs/setup.md). Test tidak dilewati diam-diam bila database tidak tersedia.
+ * Test integrasi, keamanan, dan e2e MEMBUTUHKAN PostgreSQL. Konfigurasi format
+ * Laravel: DB_HOST/DB_PORT + DB_TEST_DATABASE dengan DB_USERNAME/DB_PASSWORD
+ * (runtime) dan DB_MIGRATION_USERNAME/DB_MIGRATION_PASSWORD (pemilik); alternatif
+ * URL lengkap TEST_DATABASE_URL dan TEST_DATABASE_MIGRATION_URL. Test tidak
+ * dilewati diam-diam bila database tidak tersedia.
  */
 export function testDatabaseUrls(): TestDatabaseUrls {
-  const app = process.env.TEST_DATABASE_URL
-  const owner = process.env.TEST_DATABASE_MIGRATION_URL
+  const urls = resolveDatabaseUrls(process.env)
+  const app = urls.test.app
+  const owner = urls.test.owner
   if (!app || !owner) {
     throw new Error(
-      'TEST_DATABASE_URL dan TEST_DATABASE_MIGRATION_URL wajib diisi untuk test yang memakai database. ' +
+      `${describeMissingDatabase(app ? 'test-owner' : 'test-app')} ` +
         'Jalankan "bun run db:bootstrap" lalu "bun run db:migrate:test".',
     )
   }

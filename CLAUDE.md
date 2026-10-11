@@ -64,7 +64,10 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
 - Pada `tenant_memberships`, `membership_roles`, `roles`: kebijakan SELECT memakai `OR user_id = current_user`.
   Query dalam konteks tenant pada tabel ini **wajib** memfilter `tenant_id` eksplisit.
 - Jangan mengandalkan `WHERE tenant_id = ...` saja; RLS adalah lapisan utama, filter eksplisit = defense-in-depth.
-- Role runtime (`DATABASE_URL`) tidak boleh superuser/BYPASSRLS/pemilik tabel. Migrasi memakai role pemilik.
+- Role runtime (`DB_USERNAME`, atau `DATABASE_URL`) tidak boleh superuser/BYPASSRLS/pemilik tabel. Migrasi memakai
+  role pemilik (`DB_MIGRATION_USERNAME`). Variabel database berformat Laravel (`DB_CONNECTION=pgsql`, `DB_HOST`,
+  `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`; resolver `api/core/config/database-env.ts`); URL lengkap
+  `DATABASE_URL`/`*_URL` tetap diterima dan menang bila ada.
   GRANT ke group role `agentic_runtime`, least privilege per tabel.
 - Identitas dari cookie sesi HttpOnly saja; jangan percaya `userId`/`tenantId` dari klien. Pilihan tenant
   selalu divalidasi terhadap `tenant_memberships`. Header `x-active-tenant` dari tab hanya pemeriksaan konsistensi
@@ -153,7 +156,8 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
 ## Test
 
 - Bun Test untuk backend; Vitest (`tests/nuxt/`) untuk komponen/composable Nuxt.
-- Test DB memakai `TEST_DATABASE_URL`/`TEST_DATABASE_MIGRATION_URL`; preload menerapkan migrasi.
+- Test DB memakai `DB_TEST_DATABASE` (role `DB_USERNAME` & `DB_MIGRATION_USERNAME` yang sama) atau
+  `TEST_DATABASE_URL`/`TEST_DATABASE_MIGRATION_URL`; preload menerapkan migrasi.
 - Data test dibuat unik per test (email/slug acak) — tidak perlu truncate.
 - **Jebakan Bun:** jangan meneruskan objek `Query` Bun SQL mentah ke `expect(...).rejects`; runner menggantung.
   Bungkus: `await expect(run(() => sql\`...\`)).rejects.toThrow()`.

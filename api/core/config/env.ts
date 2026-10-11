@@ -6,6 +6,8 @@
  * mandiri tanpa perubahan. Nilai ini TIDAK PERNAH dikirim ke browser.
  */
 
+import { describeMissingDatabase, resolveDatabaseUrls } from './database-env'
+
 export type NodeEnv = 'development' | 'test' | 'production'
 
 export interface ApiConfig {
@@ -173,10 +175,12 @@ export function loadApiConfig(env: Env = process.env): ApiConfig {
   const nodeEnv = readNodeEnv(env, issues)
   const isProduction = nodeEnv === 'production'
 
-  const databaseUrl = env.DATABASE_URL ?? ''
-  if (!/^postgres(ql)?:\/\//.test(databaseUrl)) {
-    issues.push('DATABASE_URL wajib diisi dengan URL PostgreSQL (postgresql://...)')
-  }
+  // Koneksi database: format Laravel (DB_CONNECTION, DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME,
+  // DB_PASSWORD) atau URL lengkap DATABASE_URL (menang bila keduanya ada).
+  const databaseUrls = resolveDatabaseUrls(env)
+  issues.push(...databaseUrls.issues)
+  const databaseUrl = databaseUrls.app ?? ''
+  if (!databaseUrls.app) issues.push(describeMissingDatabase('app'))
 
   const secret = env.SESSION_SECRET ?? ''
   if (secret.length < 32) {

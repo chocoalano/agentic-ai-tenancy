@@ -1,19 +1,22 @@
 /**
- * KHUSUS PENGEMBANGAN: menghapus database (utama atau --test) memakai
- * DATABASE_ADMIN_URL. Dipakai oleh `bun run db:reset`, yang kemudian
- * menjalankan bootstrap dan migrasi ulang.
+ * KHUSUS PENGEMBANGAN: menghapus database (utama atau --test) memakai koneksi
+ * admin (DB_ADMIN_* atau DATABASE_ADMIN_URL). Dipakai oleh `bun run db:reset`,
+ * yang kemudian menjalankan bootstrap dan migrasi ulang.
  */
 import { SQL } from 'bun'
-import { parseDatabaseUrl, requireNonProduction } from './lib/database-urls'
+import { describeMissingDatabase, resolveDatabaseUrls } from '../api/core/config/database-env'
+import { LABELS, parseDatabaseUrl, requireNonProduction } from './lib/database-urls'
 
 requireNonProduction('db:reset')
 
 const useTest = process.argv.includes('--test')
-const variable = useTest ? 'TEST_DATABASE_MIGRATION_URL' : 'DATABASE_MIGRATION_URL'
-const target = parseDatabaseUrl(variable, process.env[variable])
-const adminUrl = process.env.DATABASE_ADMIN_URL
+const urls = resolveDatabaseUrls(process.env)
+const target = useTest
+  ? parseDatabaseUrl(LABELS.testOwner, urls.test.owner)
+  : parseDatabaseUrl(LABELS.owner, urls.owner)
+const adminUrl = urls.admin
 if (!adminUrl) {
-  console.error('✖ DATABASE_ADMIN_URL belum diisi.')
+  console.error(`✖ ${describeMissingDatabase('admin')}`)
   process.exit(1)
 }
 

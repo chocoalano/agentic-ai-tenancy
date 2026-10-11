@@ -14,7 +14,7 @@ Penyedia AI nyata belum pernah dijalankan dari lingkungan ini (BLOCKED, lihat `d
 | Mandiri | `bun run worker` (`api/worker.ts`)             | Produksi: proses terpisah dari server web, dapat diskalakan horizontal            |
 | Inline  | `AI_WORKER_INLINE=true` pada proses Nuxt/Nitro | Pengembangan, demo satu proses; worker dimulai **setelah** gerbang kesiapan lulus |
 
-Keduanya memuat konfigurasi yang sama (`loadApiConfig()`), termasuk `DATABASE_URL` role runtime (bukan superuser /
+Keduanya memuat konfigurasi yang sama (`loadApiConfig()`), termasuk koneksi database role runtime (`DB_USERNAME`/`DB_PASSWORD` format Laravel, atau `DATABASE_URL`) (bukan superuser /
 bukan pemilik) dan variabel `AI_*`. Worker mandiri memverifikasi role database dahulu (`inspectRuntimeRole`) dan
 keluar dengan kode 1 bila tidak aman; bila database belum terjangkau ia menunggu, bukan mengklaim.
 
@@ -31,8 +31,7 @@ keluar dengan kode 1 bila tidak aman; bila database belum terjangkau ia menunggu
 | `REALTIME_OUTBOX_RETENTION_HOURS` | `24`            | Retensi outbox yang dipangkas worker                                |
 | `APPROVAL_TTL_HOURS`              | `24`            | Permintaan persetujuan kedaluwarsa (disapu worker)                  |
 
-Checklist deploy: `bun run db:migrate` (migrasi 0008) **sebelum** memulai worker/server baru; `DATABASE_URL` =
-`agentic_app`; `AI_RUNTIME_PROVIDER` bukan `fixture` di production; satu proses worker minimal; `SIGTERM` diberi
+Checklist deploy: `bun run db:migrate` (migrasi 0008) **sebelum** memulai worker/server baru; `DB_USERNAME` = `agentic_app`; `AI_RUNTIME_PROVIDER` bukan `fixture` di production; satu proses worker minimal; `SIGTERM` diberi
 waktu ≥ `AI_RUNTIME_TIMEOUT_SECONDS` untuk drain.
 
 ## 2. Satu putaran (`tick`)

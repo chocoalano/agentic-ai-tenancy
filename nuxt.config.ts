@@ -70,7 +70,7 @@ export default defineNuxtConfig({
     storageKey: 'aivo-color-mode',
   },
 
-  // Hanya nilai publik. Secret server (DATABASE_URL, SESSION_SECRET) dibaca
+  // Hanya nilai publik. Secret server (DB_PASSWORD/DATABASE_URL, SESSION_SECRET) dibaca
   // langsung oleh modul API dari process.env dan tidak pernah masuk ke sini.
   runtimeConfig: {
     public: {

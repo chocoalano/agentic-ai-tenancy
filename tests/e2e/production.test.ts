@@ -25,6 +25,19 @@ import { TEST_SESSION_SECRET, testDatabaseUrls } from '../helpers/env'
 const SERVER_ENTRY = '.output/server/index.mjs'
 const COOKIE_NAME = '__Host-aivo_session'
 
+/**
+ * Env yang diwariskan ke server production yang di-spawn: koneksi database dari .env
+ * (format Laravel DB_* atau *_URL) ikut, tetapi override lokal yang mengubah perilaku
+ * default production (OpenAPI, cookie Secure, HSTS) dibuang agar test deterministik.
+ */
+function inheritedEnv(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env }
+  delete env.OPENAPI_ENABLED
+  delete env.SESSION_COOKIE_SECURE
+  delete env.SECURITY_HSTS
+  return env
+}
+
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer()
@@ -100,7 +113,7 @@ beforeAll(async () => {
   base = `http://127.0.0.1:${port}`
   server = Bun.spawn(['bun', SERVER_ENTRY], {
     env: {
-      ...process.env,
+      ...inheritedEnv(),
       NODE_ENV: 'production',
       PORT: String(port),
       HOST: '127.0.0.1',
@@ -314,7 +327,7 @@ describe('server production dengan database tidak terjangkau (gerbang kesiapan m
     degradedBase = `http://127.0.0.1:${port}`
     degraded = Bun.spawn(['bun', SERVER_ENTRY], {
       env: {
-        ...process.env,
+        ...inheritedEnv(),
         NODE_ENV: 'production',
         PORT: String(port),
         HOST: '127.0.0.1',

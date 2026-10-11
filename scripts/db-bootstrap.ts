@@ -1,46 +1,50 @@
 /**
  * Bootstrap database lokal (idempoten): membuat role dan database.
  *
- * Membutuhkan DATABASE_ADMIN_URL (role superuser/admin). Role yang dibuat:
+ * Membutuhkan koneksi admin (DB_ADMIN_USERNAME/DB_ADMIN_PASSWORD/DB_ADMIN_DATABASE, atau
+ * DATABASE_ADMIN_URL). Role yang dibuat:
  *   - agentic_runtime : group role NOLOGIN penerima hak akses tabel
- *   - <owner>         : user dari DATABASE_MIGRATION_URL, pemilik skema
- *   - <app>           : user dari DATABASE_URL, role runtime aplikasi
+ *   - <owner>         : DB_MIGRATION_USERNAME (atau user DATABASE_MIGRATION_URL), pemilik skema
+ *   - <app>           : DB_USERNAME (atau user DATABASE_URL), role runtime aplikasi
  *                       (NOSUPERUSER, NOBYPASSRLS, bukan pemilik tabel)
+ * Database test (DB_TEST_DATABASE / TEST_DATABASE_*_URL) ikut dibuat bila dikonfigurasi.
  *
  * Password role yang sudah ada tidak diubah kecuali dengan flag --sync-passwords.
  */
 import { SQL } from 'bun'
-import { parseDatabaseUrl, withDatabase, type ParsedDatabaseUrl } from './lib/database-urls'
+import { describeMissingDatabase, resolveDatabaseUrls } from '../api/core/config/database-env'
+import { LABELS, parseDatabaseUrl, withDatabase, type ParsedDatabaseUrl } from './lib/database-urls'
 
 const RUNTIME_GROUP = 'agentic_runtime'
 const syncPasswords = process.argv.includes('--sync-passwords')
 
-const adminUrl = process.env.DATABASE_ADMIN_URL
+const urls = resolveDatabaseUrls(process.env)
+for (const issue of urls.issues) console.error(`✖ ${issue}`)
+if (urls.issues.length > 0) process.exit(1)
+
+const adminUrl = urls.admin
 if (!adminUrl) {
-  console.error('✖ DATABASE_ADMIN_URL belum diisi (mis. postgresql://postgres@localhost:5432/postgres).')
+  console.error(`✖ ${describeMissingDatabase('admin')}`)
   process.exit(1)
 }
 
 const targets: { app: ParsedDatabaseUrl; owner: ParsedDatabaseUrl }[] = [
-  {
-    app: parseDatabaseUrl('DATABASE_URL', process.env.DATABASE_URL),
-    owner: parseDatabaseUrl('DATABASE_MIGRATION_URL', process.env.DATABASE_MIGRATION_URL),
-  },
+  { app: parseDatabaseUrl(LABELS.app, urls.app), owner: parseDatabaseUrl(LABELS.owner, urls.owner) },
 ]
-if (process.env.TEST_DATABASE_URL || process.env.TEST_DATABASE_MIGRATION_URL) {
+if (urls.test.app || urls.test.owner) {
   targets.push({
-    app: parseDatabaseUrl('TEST_DATABASE_URL', process.env.TEST_DATABASE_URL),
-    owner: parseDatabaseUrl('TEST_DATABASE_MIGRATION_URL', process.env.TEST_DATABASE_MIGRATION_URL),
+    app: parseDatabaseUrl(LABELS.testApp, urls.test.app),
+    owner: parseDatabaseUrl(LABELS.testOwner, urls.test.owner),
   })
 }
 
 for (const target of targets) {
   if (target.app.user === target.owner.user) {
-    console.error('✖ DATABASE_URL dan DATABASE_MIGRATION_URL harus memakai role berbeda (runtime ≠ pemilik skema).')
+    console.error('✖ Role runtime (DB_USERNAME) dan pemilik skema (DB_MIGRATION_USERNAME) harus berbeda.')
     process.exit(1)
   }
   if (target.app.database !== target.owner.database) {
-    console.error('✖ DATABASE_URL dan DATABASE_MIGRATION_URL harus menunjuk database yang sama.')
+    console.error('✖ Koneksi runtime dan pemilik skema harus menunjuk database yang sama.')
     process.exit(1)
   }
 }
@@ -77,8 +81,7 @@ try {
   const [me] = await admin<
     { is_superuser: boolean }[]
   >`select rolsuper as is_superuser from pg_roles where rolname = current_user`
-  if (!me?.is_superuser)
-    console.warn('! DATABASE_ADMIN_URL bukan superuser; pembuatan ekstensi pgvector mungkin gagal.')
+  if (!me?.is_superuser) console.warn('! Role admin bukan superuser; pembuatan ekstensi pgvector mungkin gagal.')
 
   if (!(await roleExists(RUNTIME_GROUP))) {
     await execFormatted('create role %I nologin', RUNTIME_GROUP)

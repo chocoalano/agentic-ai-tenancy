@@ -33,7 +33,7 @@ Prasyarat: Bun ≥ 1.3, PostgreSQL ≥ 15 (pgvector opsional), akses role superu
 ```bash
 bun install
 cp .env.example .env            # lalu isi password & SESSION_SECRET (lihat docs/setup.md)
-bun run db:bootstrap            # membuat role + database (butuh DATABASE_ADMIN_URL)
+bun run db:bootstrap            # membuat role + database (butuh DB_ADMIN_USERNAME atau DATABASE_ADMIN_URL)
 bun run db:migrate              # migrasi skema dengan role pemilik
 bun run db:migrate:test         # migrasi database test
 bun run db:seed                 # data contoh KHUSUS lokal

@@ -1,7 +1,7 @@
 /**
  * Seed data PENGEMBANGAN LOKAL. Tidak pernah berjalan dengan NODE_ENV=production.
  *
- * Seed dijalankan dengan role runtime aplikasi (DATABASE_URL) melalui helper
+ * Seed dijalankan dengan role runtime aplikasi (DB_USERNAME / DATABASE_URL) melalui helper
  * transaksi yang sama dengan aplikasi, sehingga seluruh data ditulis di bawah
  * kebijakan RLS. Semua agent ditandai `is_seed_data = true`.
  *

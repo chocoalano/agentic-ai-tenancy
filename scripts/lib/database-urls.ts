@@ -14,8 +14,16 @@ export interface ParsedDatabaseUrl {
 
 const IDENTIFIER = /^[a-z_][a-z0-9_]{0,62}$/
 
+/** Label koneksi untuk pesan error (format Laravel DB_* dengan alternatif URL lengkap). */
+export const LABELS = {
+  app: 'koneksi runtime (DB_USERNAME/DB_PASSWORD atau DATABASE_URL)',
+  owner: 'koneksi pemilik skema (DB_MIGRATION_USERNAME/DB_MIGRATION_PASSWORD atau DATABASE_MIGRATION_URL)',
+  testApp: 'koneksi runtime database test (DB_TEST_DATABASE atau TEST_DATABASE_URL)',
+  testOwner: 'koneksi pemilik skema database test (DB_TEST_DATABASE atau TEST_DATABASE_MIGRATION_URL)',
+} as const
+
 export function parseDatabaseUrl(name: string, value: string | undefined): ParsedDatabaseUrl {
-  if (!value) throw new Error(`${name} belum diisi. Lihat .env.example.`)
+  if (!value) throw new Error(`${name} belum dikonfigurasi. Lihat .env.example (bagian Database).`)
   let url: URL
   try {
     url = new URL(value)

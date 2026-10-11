@@ -1,16 +1,22 @@
 /**
  * Menjalankan migrasi SQL di db/migrations memakai role pemilik skema.
  *
- *   bun run db:migrate          → database utama (DATABASE_MIGRATION_URL)
- *   bun run db:migrate --test   → database test (TEST_DATABASE_MIGRATION_URL)
+ *   bun run db:migrate          → database utama (DB_DATABASE dengan DB_MIGRATION_USERNAME,
+ *                                 atau DATABASE_MIGRATION_URL)
+ *   bun run db:migrate --test   → database test (DB_TEST_DATABASE, atau TEST_DATABASE_MIGRATION_URL)
  */
 import { SQL } from 'bun'
+import { resolveDatabaseUrls } from '../api/core/config/database-env'
 import { runMigrations } from '../db/migrator'
-import { parseDatabaseUrl } from './lib/database-urls'
+import { LABELS, parseDatabaseUrl } from './lib/database-urls'
 
 const useTest = process.argv.includes('--test')
-const variable = useTest ? 'TEST_DATABASE_MIGRATION_URL' : 'DATABASE_MIGRATION_URL'
-const target = parseDatabaseUrl(variable, process.env[variable])
+const urls = resolveDatabaseUrls(process.env)
+for (const issue of urls.issues) console.error(`✖ ${issue}`)
+if (urls.issues.length > 0) process.exit(1)
+const target = useTest
+  ? parseDatabaseUrl(LABELS.testOwner, urls.test.owner)
+  : parseDatabaseUrl(LABELS.owner, urls.owner)
 const sql = new SQL({ url: target.url, max: 1 })
 
 try {

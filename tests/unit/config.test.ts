@@ -43,6 +43,26 @@ describe('loadApiConfig', () => {
     expect(() => loadApiConfig({ ...BASE, DATABASE_POOL_MAX: '0' })).toThrow(/DATABASE_POOL_MAX/)
   })
 
+  test('menerima variabel database format Laravel (DB_CONNECTION, DB_HOST, ...) dan menolak yang tidak lengkap', () => {
+    const laravel = {
+      SESSION_SECRET: BASE.SESSION_SECRET,
+      DB_CONNECTION: 'pgsql',
+      DB_HOST: '127.0.0.1',
+      DB_PORT: '5432',
+      DB_DATABASE: 'agentic_office',
+      DB_USERNAME: 'agentic_app',
+      DB_PASSWORD: 'p@ss word',
+    }
+    expect(loadApiConfig(laravel).database.url).toBe(
+      'postgresql://agentic_app:p%40ss%20word@127.0.0.1:5432/agentic_office',
+    )
+    // URL lengkap menang bila keduanya ada.
+    expect(loadApiConfig({ ...laravel, DATABASE_URL: BASE.DATABASE_URL }).database.url).toBe(BASE.DATABASE_URL)
+    expect(() => loadApiConfig({ ...laravel, DB_CONNECTION: 'mysql' })).toThrow(/DB_CONNECTION/)
+    expect(() => loadApiConfig({ ...laravel, DB_DATABASE: undefined })).toThrow(/DB_HOST, DB_PORT, dan DB_DATABASE/)
+    expect(() => loadApiConfig({ SESSION_SECRET: BASE.SESSION_SECRET })).toThrow(/DB_CONNECTION=pgsql, DB_HOST/)
+  })
+
   test('heartbeat SSE default di bawah idle timeout Bun (10 dtk); kombinasi yang memutus stream ditolak', () => {
     expect(loadApiConfig(BASE).realtime.heartbeatIntervalMs).toBe(5_000)
     expect(() => loadApiConfig({ ...BASE, REALTIME_HEARTBEAT_MS: '15000' })).toThrow(/idle timeout server/)
