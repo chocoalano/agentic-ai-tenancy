@@ -1,4 +1,4 @@
-import type { IslandId, Point, PortalLink, World } from './world'
+import { insidePolygon, type IslandId, type Point, type PortalLink, type World } from './world'
 
 /*
  * Navigasi: graf pulau (simpul) + tautan portal (sisi, mengikuti jaringan
@@ -44,25 +44,29 @@ function samePoint(a: Point, b: Point): boolean {
   return Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5
 }
 
-/** Simpul tengah dilewati hanya bila searah (memutar ≤ 25%); selain itu langsung. */
-const HUB_DETOUR_LIMIT = 1.25
+/** Ruas lurus tetap di atas area jalan? (disampel setiap ±6 unit; ujung dianggap sah). */
+function segmentInside(polygon: readonly Point[], a: Point, b: Point): boolean {
+  const steps = Math.max(2, Math.ceil(distance(a, b) / 6))
+  for (let i = 1; i < steps; i += 1) {
+    const t = i / steps
+    if (!insidePolygon({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, polygon)) return false
+  }
+  return true
+}
 
 /**
- * Jalur lokal di satu pulau. Area jalan berupa poligon cembung, sehingga ruas
- * lurus antara dua titik di dalamnya tetap di atas pulau. Simpul tengah dipakai
- * sebagai titik lewat bila hampir searah, agar robot tidak bolak-balik.
+ * Jalur lokal di satu pulau. Area jalan adalah apron berbentuk "U" di depan
+ * bangunan (cekung), jadi ruas lurus bisa memotong bangunan. Bila ruas
+ * langsung tetap di dalam area jalan → langsung; selain itu lewat simpul
+ * navigasi di tengah pita depan, yang "melihat" kedua sayap.
  */
 export function localPath(world: World, island: IslandId, from: Point, to: Point): Point[] {
-  const hub = world.islands.get(island)?.hub
-  const points = [from]
-  const viaHub =
-    hub !== undefined &&
-    !samePoint(from, hub) &&
-    !samePoint(to, hub) &&
-    distance(from, hub) + distance(hub, to) <= distance(from, to) * HUB_DETOUR_LIMIT
-  if (hub && viaHub) points.push(hub)
-  if (!samePoint(points[points.length - 1] ?? from, to)) points.push(to)
-  return points
+  const target = world.islands.get(island)
+  if (!target || samePoint(from, to)) return [from]
+  if (samePoint(from, target.hub) || samePoint(to, target.hub) || segmentInside(target.walkable, from, to)) {
+    return [from, to]
+  }
+  return [from, target.hub, to]
 }
 
 /** Dijkstra di atas graf pulau; mengembalikan urutan tautan yang dilalui. */
@@ -85,8 +89,8 @@ export function islandPath(world: World, from: IslandId, to: IslandId): Array<{ 
       const backward = link.b === current
       if (!forward && !backward) continue
       const next = forward ? link.b : link.a
-      const a = world.islands.get(current)?.portal.point
-      const b = world.islands.get(next)?.portal.point
+      const a = world.islands.get(current)?.portal.entry
+      const b = world.islands.get(next)?.portal.exit
       const cost = (best.get(current) ?? 0) + TELEPORT_COST + (a && b ? distance(a, b) * 0.2 : 0)
       if (cost < (best.get(next) ?? Infinity)) {
         best.set(next, cost)
@@ -115,8 +119,8 @@ export function findRoute(world: World, from: Location, to: Location): RouteLeg[
   const hops = islandPath(world, from.island, to.island)
   if (hops.length === 0) return []
   const legs: RouteLeg[] = []
-  const startPortal = world.islands.get(from.island)?.portal.point
-  const endPortal = world.islands.get(to.island)?.portal.point
+  const startPortal = world.islands.get(from.island)?.portal.entry
+  const endPortal = world.islands.get(to.island)?.portal.exit
   if (!startPortal || !endPortal) return []
   const toPortal = localPath(world, from.island, from.point, startPortal)
   if (toPortal.length > 1) legs.push({ kind: 'walk', island: from.island, points: toPortal })

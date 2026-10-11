@@ -32,6 +32,8 @@ const props = defineProps<{
   selection: OfficeSelection | null
   /** Posisi kaki terkini dari mesin (untuk fokus kamera saat robot bergerak). */
   locate: (key: string) => { x: number; y: number } | null
+  /** Overlay kalibrasi geometri (hanya pengembangan). */
+  debugGeometry?: boolean
 }>()
 
 const emit = defineEmits<{ select: [selection: OfficeSelection | null] }>()
@@ -233,6 +235,8 @@ defineExpose({
       />
 
       <OfficeEffects class="z-50" :portal-flashes="portalFlashes" />
+      <!-- Overlay kalibrasi geometri: hanya `nuxt dev` + ?debug=geometry (tidak ada di production). -->
+      <OfficeGeometryDebug v-if="debugGeometry" />
 
       <div role="group" :aria-label="preview ? 'Karakter pratinjau' : 'AI employee di lantai kantor'" class="contents">
         <OfficeActor

@@ -11,3 +11,5 @@ app/components/ui
 design
 # Aset & manifest asli dari asset pack (dibiarkan identik dengan sumbernya).
 public/game-assets
+# Fixture mask geometri (dihasilkan, satu baris besar)
+tests/fixtures/island-surface.json

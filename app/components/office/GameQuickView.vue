@@ -3,6 +3,7 @@ import { ArrowUpRight, CircleCheck, Circle, Lock, X } from '@lucide/vue'
 import type { OfficeAgentView } from '~/composables/useOfficeEngine'
 import type { IslandId } from '~/game/world'
 import { CHARACTER_STATES, ISLANDS } from '~/utils/game-assets'
+import { isWalkableIsland } from '~/game/world'
 import { MISSION_HUB, STATIONS } from '~/utils/office-layout'
 import type { MissionViewModel } from '~/utils/office-preview'
 import type { MissionStepStatus } from '~/utils/office-mission'
@@ -40,9 +41,12 @@ const incoming = computed(() =>
   islandId.value ? props.agents.filter((agent) => agent.destination === islandId.value) : [],
 )
 const assignable = computed(() =>
-  props.agents.filter(
-    (agent) => agent.activity !== 'offline' && agent.island !== islandId.value && agent.destination !== islandId.value,
-  ),
+  islandId.value && isWalkableIsland(islandId.value)
+    ? props.agents.filter(
+        (agent) =>
+          agent.activity !== 'offline' && agent.island !== islandId.value && agent.destination !== islandId.value,
+      )
+    : [],
 )
 
 const step = computed(() => {

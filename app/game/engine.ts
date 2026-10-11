@@ -391,10 +391,10 @@ export class OfficeEngine {
         leg,
         phase: 'in',
         started: this.time,
-        from: islandFrom.portal.point,
-        to: islandTo.portal.point,
+        from: islandFrom.portal.entry,
+        to: islandTo.portal.exit,
       }
-      agent.position = { ...islandFrom.portal.point }
+      agent.position = { ...islandFrom.portal.entry }
       this.emit({ type: 'teleport', key: agent.key, from: leg.from, to: leg.to, phase: 'in' })
     }
     const run = agent.teleport

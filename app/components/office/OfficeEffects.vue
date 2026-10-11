@@ -41,15 +41,18 @@ const effects = WORLD_FX.map((item, index) => {
 
 const PAD_WIDTH = 50
 const padSize = visibleSize(FX['portal-cyan'])
-const pads = [...buildWorld().islands.values()].map((island) => ({
-  island: island.id,
-  style: placement(
-    island.portal.point.x,
-    island.portal.point.y,
-    PAD_WIDTH,
-    (PAD_WIDTH * padSize.height) / padSize.width,
-  ),
-}))
+// Satu pad per titik portal: masuk & keluar digabung bila titiknya sama.
+const pads = [...buildWorld().islands.values()].flatMap((island) => {
+  const points = [island.portal.entry]
+  if (island.portal.exit.x !== island.portal.entry.x || island.portal.exit.y !== island.portal.entry.y) {
+    points.push(island.portal.exit)
+  }
+  return points.map((point, index) => ({
+    island: island.id,
+    key: `${island.id}-${index}`,
+    style: placement(point.x, point.y, PAD_WIDTH, (PAD_WIDTH * padSize.height) / padSize.width),
+  }))
+})
 </script>
 
 <template>
@@ -59,7 +62,7 @@ const pads = [...buildWorld().islands.values()].map((island) => ({
     </span>
     <span
       v-for="pad in pads"
-      :key="`pad-${pad.island}`"
+      :key="`pad-${pad.key}`"
       :class="[
         'absolute transition-[transform,opacity,filter] duration-300',
         props.portalFlashes.includes(pad.island)

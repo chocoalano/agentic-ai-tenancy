@@ -37,7 +37,7 @@ export const ATLAS_START: ReadonlyArray<{ character: CharacterKey; island: Islan
   { character: 'nova', island: 'client-brief', slot: 0 },
   { character: 'sage', island: 'web-research', slot: 0 },
   { character: 'pixel', island: 'analytics-tool', slot: 0 },
-  { character: 'bolt', island: 'report-builder', slot: 0 },
+  { character: 'bolt', island: 'task-manager', slot: 0 },
   { character: 'echo', island: 'knowledge-base', slot: 0 },
 ]
 

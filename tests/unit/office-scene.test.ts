@@ -11,6 +11,7 @@ import {
   hubBox,
   stationBox,
   type SceneAgentInput,
+  stationSlots,
 } from '../../app/utils/office-layout'
 import { deriveSetupMission } from '../../app/utils/office-mission'
 import { PREVIEW_MISSION, previewActors, previewRoster, stationStatesFor } from '../../app/utils/office-preview'
@@ -121,13 +122,13 @@ describe('scene Virtual Office', () => {
   })
 
   test('slot penuh → fallback ke stasiun lain; semua pulau penuh → overflow jujur', () => {
-    const capacity = STATIONS.reduce((total, station) => total + station.slots.length, 0)
+    const capacity = STATIONS.reduce((total, station) => total + stationSlots(station).length, 0)
     const crowd = Array.from({ length: capacity + 3 }, () => agent('customer-support'))
     const scene = buildOfficeScene(crowd)
     expect(scene.placements.size).toBe(capacity)
     expect(scene.overflow).toHaveLength(3)
     for (const station of scene.stations)
-      expect(station.agents.length).toBeLessThanOrEqual(station.definition.slots.length)
+      expect(station.agents.length).toBeLessThanOrEqual(stationSlots(station.definition).length)
   })
 
   test('jaringan energi: satu spoke per stasiun + rute misi + tautan, seluruhnya di dalam dunia', () => {

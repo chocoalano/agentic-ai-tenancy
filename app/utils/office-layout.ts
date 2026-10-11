@@ -1,4 +1,6 @@
 import type { AgentLifecycleStatus } from '../../domains/agents/types'
+import { toWorld } from '../game/geometry'
+import { ISLAND_ART_GEOMETRY } from '../game/island-geometry'
 import {
   CHARACTER_KEYS,
   ISLANDS,
@@ -92,15 +94,7 @@ export interface StationDefinition {
   /** `far` = pulau di kejauhan (lebih kecil, sedikit redup). */
   depth: 'near' | 'far'
   keywords: readonly string[]
-  /** Titik kaki robot, fraksi area terlihat pulau. */
-  slots: ReadonlyArray<{ x: number; y: number }>
 }
-
-/** Dua slot di platform depan; slot kedua lebih rendah agar label tidak bertumpuk. */
-const FRONT_SLOTS = [
-  { x: 0.8, y: 0.66 },
-  { x: 0.32, y: 0.7 },
-] as const
 
 /** Urutan = prioritas pencocokan kata kunci. Posisi mengikuti komposisi referensi. */
 export const STATIONS: readonly StationDefinition[] = [
@@ -113,7 +107,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 320,
     depth: 'near',
     keywords: ['customer', 'client', 'support', 'service', 'sales', 'account', 'success', 'helpdesk'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'analytics-tool',
@@ -124,7 +117,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 305,
     depth: 'near',
     keywords: ['analyst', 'analytics', 'finance', 'financial', 'accounting', 'monitoring', 'fleet', 'insight'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'data-warehouse',
@@ -135,7 +127,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 350,
     depth: 'near',
     keywords: ['data', 'database', 'procurement', 'inventory', 'warehouse', 'supply'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'web-research',
@@ -146,7 +137,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 345,
     depth: 'near',
     keywords: ['research', 'researcher', 'market', 'seo', 'scout', 'intelligence', 'riset'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'report-builder',
@@ -157,7 +147,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 330,
     depth: 'near',
     keywords: ['report', 'reporting', 'writer', 'content', 'copywriter', 'editor', 'documentation'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'knowledge-base',
@@ -168,7 +157,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 305,
     depth: 'near',
     keywords: ['knowledge', 'legal', 'compliance', 'policy', 'docs', 'wiki'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'task-manager',
@@ -179,7 +167,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 290,
     depth: 'near',
     keywords: ['coordinator', 'logistics', 'project', 'operations', 'ops', 'planner', 'delivery', 'admin'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'training-center',
@@ -190,7 +177,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 90,
     depth: 'far',
     keywords: ['hr', 'recruiter', 'recruitment', 'training', 'people', 'talent', 'onboarding'],
-    slots: FRONT_SLOTS,
   },
   {
     id: 'research-lab',
@@ -201,7 +187,6 @@ export const STATIONS: readonly StationDefinition[] = [
     width: 90,
     depth: 'far',
     keywords: ['engineer', 'developer', 'product', 'lab', 'scientist', 'rnd', 'qa'],
-    slots: FRONT_SLOTS,
   },
 ]
 
@@ -300,11 +285,15 @@ function timeOf(value: Date | string): number {
   return value instanceof Date ? value.getTime() : Date.parse(value)
 }
 
+/** Slot workstation stasiun (dari geometri artwork; kosong bila pulau dekoratif). */
+export function stationSlots(station: StationDefinition): ReadonlyArray<{ x: number; y: number }> {
+  return ISLAND_ART_GEOMETRY[station.id].workstationSlots
+}
+
 /** Titik kaki robot pada slot pulau (unit dunia). */
 export function slotPoint(station: StationDefinition, slot: number): { x: number; y: number } {
-  const point = station.slots[slot] ?? { x: 0.5, y: 0.66 }
-  const box = stationBox(station)
-  return { x: box.left + box.width * point.x, y: box.top + box.height * point.y }
+  const point = stationSlots(station)[slot] ?? ISLAND_ART_GEOMETRY[station.id].spawnPoint
+  return toWorld(stationBox(station), point)
 }
 
 /**
@@ -320,7 +309,8 @@ export function buildOfficeScene<T extends SceneAgentInput>(agents: readonly T[]
   const placements = new Map<string, PlacedAgent<T>>()
   const overflow: T[] = []
 
-  const hasRoom = (station: StationDefinition) => (occupancy.get(station.id)?.length ?? 0) < station.slots.length
+  const hasRoom = (station: StationDefinition) =>
+    (occupancy.get(station.id)?.length ?? 0) < stationSlots(station).length
 
   for (const agent of ordered) {
     let station = preferredStation(agent)

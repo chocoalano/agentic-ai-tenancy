@@ -27,7 +27,8 @@
     "api:standalone": "bun api/standalone.ts",
     "check:assets": "bun scripts/check-game-assets.ts",
     "assets:v2": "bun scripts/build-game-assets-v2.ts",
-    "assets:audit": "bun scripts/audit-game-assets.ts"
+    "assets:audit": "bun scripts/audit-game-assets.ts",
+    "assets:geometry": "bun scripts/calibrate-island-geometry.ts"
   },
   "dependencies": {
     "@elysia/openapi": "~1.4.16",

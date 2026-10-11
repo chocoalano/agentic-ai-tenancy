@@ -28,7 +28,13 @@ function run(engine: OfficeEngine, seconds: number, onTick?: () => void) {
 describe('dunia & navigasi', () => {
   test('semua simpul pulau berada di dalam area jalan', () => {
     for (const island of world.islands.values()) {
-      for (const point of [island.spawn, island.hub, island.portal.point, ...island.workstations.map((w) => w.point)]) {
+      for (const point of [
+        island.spawn,
+        island.hub,
+        island.portal.entry,
+        island.portal.exit,
+        ...island.workstations.map((w) => w.point),
+      ]) {
         expect(insidePolygon(point, island.walkable)).toBe(true)
       }
     }
@@ -135,7 +141,7 @@ describe('mesin gerak', () => {
     expect(canTransition('failed', 'idle')).toBe(true)
     for (const state of ACTIVITY_STATES) expect(canTransition(state, state)).toBe(true)
     const engine = new OfficeEngine(world)
-    engine.setAgents([spec('arka', 'training-center', 'offline')])
+    engine.setAgents([spec('arka', 'task-manager', 'offline')])
     expect(engine.moveTo('arka', { island: 'mission-hub' })).toBe(false)
     expect(engine.setActivity('arka', { state: 'working' })).toBe(false)
   })
@@ -310,7 +316,7 @@ describe('perintah & adaptor live', () => {
       ],
       new Map([
         ['a', { character: 'echo', stationId: 'client-brief', slot: 0 }],
-        ['b', { character: 'nova', stationId: 'training-center', slot: 0 }],
+        ['b', { character: 'nova', stationId: 'task-manager', slot: 0 }],
       ]),
     )
     expect(specs.map((item) => [item.key, item.activity, item.preview])).toEqual([

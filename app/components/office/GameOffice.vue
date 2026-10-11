@@ -321,6 +321,9 @@ onMounted(() => {
   office.stage.value = world.value?.stageElement ?? null
 })
 
+/** Overlay kalibrasi geometri: hanya `nuxt dev` dan ?debug=geometry (tidak pernah di production). */
+const debugGeometry = computed(() => import.meta.dev && useRoute().query.debug === 'geometry')
+
 function locate(key: string) {
   const agent = office.engine.agents.get(key)
   return agent ? { ...agent.position } : null
@@ -350,6 +353,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
       :preview="preview"
       :selection="selection"
       :locate="locate"
+      :debug-geometry="debugGeometry"
       @select="select"
     />
 

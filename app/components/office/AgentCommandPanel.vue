@@ -5,6 +5,7 @@ import { AGENT_COMMANDS, type CommandDefinition } from '~/game/commands'
 import type { IslandId } from '~/game/world'
 import type { AgentSummary } from '~/utils/api-types'
 import { CHARACTERS, centeringShift } from '~/utils/game-assets'
+import { isWalkableIsland } from '~/game/world'
 import { MISSION_HUB, STATIONS } from '~/utils/office-layout'
 
 /**
@@ -44,9 +45,13 @@ const showMove = ref(false)
 const showLog = ref(true)
 const input = ref<HTMLTextAreaElement | null>(null)
 
+// Hanya pulau yang bisa dijalani (pulau dekoratif tanpa permukaan jalan tidak ditawarkan).
 const destinations = computed(() => [
   { id: 'mission-hub' as const, label: MISSION_HUB.label },
-  ...STATIONS.map((station) => ({ id: station.id, label: station.label })),
+  ...STATIONS.filter((station) => isWalkableIsland(station.id)).map((station) => ({
+    id: station.id,
+    label: station.label,
+  })),
 ])
 const stationLabel = computed(() => destinations.value.find((item) => item.id === props.agent.island)?.label ?? '')
 
