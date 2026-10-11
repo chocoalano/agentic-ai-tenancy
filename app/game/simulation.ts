@@ -32,13 +32,18 @@ export interface SimulationPhase {
   actions: SimulationAction[]
 }
 
-/** Posisi awal tersebar pada workstation utama, mengikuti komposisi referensi. */
+/**
+ * Posisi awal: sengaja BERBEDA dari tujuan fase masing-masing agar perjalanan
+ * (jalan → portal → teleport → jalan) benar-benar terlihat untuk kelima robot:
+ * Sage → Web Research, Pixel → Analytics Tool, Bolt → Report Builder,
+ * Echo → Data Warehouse, Nova → Mission Hub (diuji).
+ */
 export const ATLAS_START: ReadonlyArray<{ character: CharacterKey; island: IslandId; slot: number }> = [
   { character: 'nova', island: 'client-brief', slot: 0 },
-  { character: 'sage', island: 'web-research', slot: 0 },
-  { character: 'pixel', island: 'analytics-tool', slot: 0 },
+  { character: 'sage', island: 'mission-hub', slot: 0 },
+  { character: 'pixel', island: 'knowledge-base', slot: 0 },
   { character: 'bolt', island: 'task-manager', slot: 0 },
-  { character: 'echo', island: 'knowledge-base', slot: 0 },
+  { character: 'echo', island: 'mission-hub', slot: 1 },
 ]
 
 export const ATLAS_PHASES: readonly SimulationPhase[] = [
@@ -116,6 +121,12 @@ interface PendingAction {
   waitingArrival: boolean
   until: number | null
   done: boolean
+  /**
+   * Ditahan: robot dijeda pengguna atau rutenya disela dari luar (dibatalkan,
+   * tiba di pulau lain). Tidak dihitung waktu dan tidak pernah "selesai" diam-
+   * diam; `resumeActor` menerbitkan ulang gerak/aktivitas yang direncanakan.
+   */
+  held: boolean
   action: SimulationAction
 }
 
@@ -126,6 +137,8 @@ export interface SimulationSnapshot {
   completedObjectives: string[]
   task: string
   speed: number
+  /** Robot yang fasenya sedang ditahan (menunggu "Lanjutkan agent"). */
+  heldActors: string[]
 }
 
 /**
@@ -165,6 +178,7 @@ export class SimulationController {
       completedObjectives: [...this.completedObjectives],
       task: this.task,
       speed: this.engine.speed,
+      heldActors: [...new Set(this.pending.filter((item) => item.held && !item.done).map((item) => item.key))],
     }
   }
 
@@ -178,15 +192,71 @@ export class SimulationController {
     this.rejectedActions.length = 0
     this.unsubscribe?.()
     this.unsubscribe = this.engine.on((event) => {
-      if (event.type !== 'arrived') return
-      for (const item of this.pending) {
-        if (item.key === event.key && item.waitingArrival) {
-          item.waitingArrival = false
-          item.until = this.engine.time + item.action.seconds
+      if (event.type === 'arrived') {
+        for (const item of this.pending) {
+          if (item.key !== event.key || !item.waitingArrival || item.done) continue
+          if (event.island === item.action.moveTo) {
+            item.waitingArrival = false
+            item.until = this.engine.time + item.action.seconds
+          } else {
+            // Tiba di pulau lain (mis. keluar portal setelah rute dibatalkan, atau dipindahkan
+            // pengguna): rencana ditahan sampai dilanjutkan — tidak dianggap selesai.
+            item.held = true
+          }
+        }
+      }
+      if (event.type === 'activity' && event.to === 'idle') {
+        // Rute dibatalkan dari luar saat menunggu tiba → tahan (bukan menggantung tanpa jalan keluar).
+        const agent = this.engine.agents.get(event.key)
+        for (const item of this.pending) {
+          if (item.key === event.key && item.waitingArrival && !item.done && agent && agent.route.length === 0) {
+            item.held = true
+          }
         }
       }
     })
     this.nextPhase()
+  }
+
+  /** Jeda satu robot: gerak/aktivitasnya dihentikan, rencananya ditahan (bukan dibuang). */
+  pauseActor(key: string): boolean {
+    if (!this.engine.agents.has(key)) return false
+    for (const item of this.pending) if (item.key === key && !item.done) item.held = true
+    this.engine.setActivity(key, { state: 'idle' })
+    this.notify()
+    return true
+  }
+
+  /** Lanjutkan robot yang dijeda: terbitkan ulang gerak ke tujuan fase atau aktivitasnya. */
+  resumeActor(key: string): boolean {
+    let resumed = false
+    for (const item of this.pending) {
+      if (item.key !== key || !item.held || item.done) continue
+      item.held = false
+      resumed = true
+      this.issue(item)
+    }
+    if (resumed) this.notify()
+    return resumed
+  }
+
+  /** Jalankan aksi: pindah (menunggu tiba) atau langsung beraktivitas dengan durasi penuh. */
+  private issue(item: PendingAction) {
+    const agent = this.engine.agents.get(item.key)
+    const target = item.action.moveTo
+    if (target && agent && (agent.island !== target || agent.route.length > 0)) {
+      const moved = this.engine.moveTo(item.key, { island: target }, { state: item.action.activity })
+      if (!moved) this.rejectedActions.push(`${this.phases[this.phaseIndex]?.id}:${item.action.actor}:moveTo`)
+      const travelling = moved && (this.engine.agents.get(item.key)?.route.length ?? 0) > 0
+      item.waitingArrival = travelling
+      item.until = travelling ? null : this.engine.time + item.action.seconds
+      return
+    }
+    if (!this.engine.setActivity(item.key, { state: item.action.activity })) {
+      this.rejectedActions.push(`${this.phases[this.phaseIndex]?.id}:${item.action.actor}:${item.action.activity}`)
+    }
+    item.waitingArrival = false
+    item.until = this.engine.time + item.action.seconds
   }
 
   pause() {
@@ -237,23 +307,20 @@ export class SimulationController {
       this.notify()
       return
     }
-    this.pending = phase.actions.map((action) => {
-      const key = `preview:${action.actor}`
-      const until = this.engine.time + action.seconds
-      if (action.say) this.engine.say(key, action.say, Math.min(action.seconds + 1.5, 5))
-      if (action.moveTo) {
-        const moved = this.engine.moveTo(key, { island: action.moveTo }, { state: action.activity })
-        if (!moved) this.rejectedActions.push(`${phase.id}:${action.actor}:moveTo`)
-        // Sudah di tujuan / reduced motion → moveTo tiba seketika; event 'arrived'
-        // terjadi sebelum item ini terdaftar, jadi jangan menunggunya.
-        const travelling = moved && (this.engine.agents.get(key)?.route.length ?? 0) > 0
-        return { key, action, waitingArrival: travelling, until: travelling ? null : until, done: false }
-      }
-      if (!this.engine.setActivity(key, { state: action.activity })) {
-        this.rejectedActions.push(`${phase.id}:${action.actor}:${action.activity}`)
-      }
-      return { key, action, waitingArrival: false, until, done: false }
-    })
+    // Daftarkan dulu (agar listener melihat item), lalu terbitkan aksinya. Sudah di tujuan /
+    // reduced motion → moveTo tiba seketika dan durasi langsung berjalan.
+    this.pending = phase.actions.map((action) => ({
+      key: `preview:${action.actor}`,
+      action,
+      waitingArrival: false,
+      until: null,
+      done: false,
+      held: false,
+    }))
+    for (const item of this.pending) {
+      if (item.action.say) this.engine.say(item.key, item.action.say, Math.min(item.action.seconds + 1.5, 5))
+      this.issue(item)
+    }
     this.notify()
   }
 
@@ -263,6 +330,10 @@ export class SimulationController {
     let allDone = true
     for (const item of this.pending) {
       if (item.done) continue
+      if (item.held) {
+        allDone = false
+        continue
+      }
       if (!item.waitingArrival && item.until !== null && this.engine.time >= item.until) {
         item.done = true
         // Durasi aktivitas habis → kembali siaga.

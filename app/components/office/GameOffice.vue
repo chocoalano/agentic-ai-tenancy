@@ -238,17 +238,19 @@ function instruct(text: string) {
   feedback.value = `Simulasi: ${target.name} → ${islandLabel(parsed.island)} (${ACTIVITY_PRESENTATION[parsed.activity].label.toLowerCase()}).`
 }
 
+/** Jeda satu robot: gerak/aktivitas berhenti; rencana fasenya ditahan, bukan dibuang. */
 function pauseAgent() {
   const current = selectedAgent.value
   if (!current || !preview.value) return
-  office.setActivity(current.key, { state: 'idle' })
-  feedback.value = `Simulasi: ${current.name} dijeda.`
+  office.pauseActor(current.key)
+  feedback.value = `Simulasi: ${current.name} dijeda — tekan Lanjutkan agent untuk meneruskan rencananya.`
 }
 
+/** Lanjutkan: rencana fase diterbitkan ulang; tanpa rencana, kembali ke aktivitas stasiunnya. */
 function resumeAgent() {
   const current = selectedAgent.value
   if (!current || !preview.value) return
-  office.setActivity(current.key, { state: STATION_ACTIVITY[current.island] })
+  if (!office.resumeActor(current.key)) office.setActivity(current.key, { state: STATION_ACTIVITY[current.island] })
   feedback.value = `Simulasi: ${current.name} melanjutkan aktivitas.`
 }
 

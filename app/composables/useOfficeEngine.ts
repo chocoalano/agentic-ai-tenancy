@@ -189,16 +189,21 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     frameHandle = requestAnimationFrame(loop)
   }
 
+  let motion: MediaQueryList | null = null
+  const onMotionChange = (event: MediaQueryListEvent) => {
+    engine.reducedMotion = event.matches
+  }
   onMounted(() => {
-    const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
+    motion = window.matchMedia('(prefers-reduced-motion: reduce)')
     engine.reducedMotion = motion.matches
-    motion.addEventListener('change', (event) => {
-      engine.reducedMotion = event.matches
-    })
+    motion.addEventListener('change', onMotionChange)
     windowStart = performance.now()
     frameHandle = requestAnimationFrame(loop)
   })
-  onBeforeUnmount(() => cancelAnimationFrame(frameHandle))
+  onBeforeUnmount(() => {
+    cancelAnimationFrame(frameHandle)
+    motion?.removeEventListener('change', onMotionChange)
+  })
 
   // Pergantian mode / data live.
   watch(options.preview, () => {
@@ -232,6 +237,8 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     },
     pauseSimulation: () => simulation.pause(),
     resumeSimulation: () => simulation.resume(),
+    pauseActor: (key: string) => simulation.pauseActor(key),
+    resumeActor: (key: string) => simulation.resumeActor(key),
     resetSimulation: () => {
       simulation.reset(CHARACTER_NAMES)
       logs.clear()

@@ -7,7 +7,7 @@ import { AGENT_COMMANDS, parsePreviewInstruction } from '../../app/game/commands
 import { OfficeEngine, type AgentSpec } from '../../app/game/engine'
 import { liveAgentSpecs, mapRealtimeEvent } from '../../app/game/live-adapter'
 import { findRoute, islandPath } from '../../app/game/navigation'
-import { ATLAS_PHASES, SimulationController, atlasAgentSpecs } from '../../app/game/simulation'
+import { ATLAS_PHASES, ATLAS_START, SimulationController, atlasAgentSpecs } from '../../app/game/simulation'
 import { buildWorld, insidePolygon, type IslandId } from '../../app/game/world'
 import { CHARACTER_KEYS } from '../../app/utils/game-assets'
 
@@ -133,6 +133,46 @@ describe('mesin gerak', () => {
     expect(agent.activity).toBe('working')
   })
 
+  test('animasi teleport: masuk diputar maju (0→7), keluar diputar MUNDUR (7→0) dengan frame yang berubah', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents([spec('sage', 'mission-hub')])
+    expect(engine.moveTo('sage', { island: 'web-research' })).toBe(true)
+    const inFrames: number[] = []
+    const outFrames: number[] = []
+    for (let i = 0; i < 30 * 15 && engine.agents.get('sage')?.route.length; i += 1) {
+      engine.tick(1 / 30)
+      const agent = engine.agents.get('sage')
+      const state = engine.renderStates().find((item) => item.key === 'sage')
+      if (agent?.teleport?.phase === 'in' && state) inFrames.push(state.frame)
+      if (agent?.teleport?.phase === 'out' && state) outFrames.push(state.frame)
+    }
+    expect(inFrames[0]).toBe(0)
+    expect(Math.max(...inFrames)).toBe(AGENT_ANIMATIONS.teleport.frames - 1)
+    expect(outFrames[0]).toBe(AGENT_ANIMATIONS.teleport.frames - 1)
+    expect(outFrames[outFrames.length - 1]).toBe(0)
+    for (let i = 1; i < outFrames.length; i += 1) expect(outFrames[i]).toBeLessThanOrEqual(outFrames[i - 1] as number)
+    expect(new Set(outFrames).size).toBeGreaterThan(3)
+  })
+
+  test('reduced motion: animasi non-loop (celebrate, error) diam di frame 0; state tetap berubah', () => {
+    const engine = new OfficeEngine(world, { reducedMotion: true })
+    engine.setAgents([spec('sage', 'mission-hub')])
+    engine.setActivity('sage', { state: 'completed', seconds: 2, next: 'idle' })
+    const frames = new Set<number>()
+    for (let i = 0; i < 30; i += 1) {
+      engine.tick(1 / 30)
+      frames.add(engine.renderStates().find((item) => item.key === 'sage')?.frame ?? -1)
+    }
+    expect([...frames]).toEqual([0])
+    engine.setActivity('sage', { state: 'failed', seconds: 1, next: 'idle' })
+    for (let i = 0; i < 20; i += 1) {
+      engine.tick(1 / 30)
+      expect(engine.renderStates().find((item) => item.key === 'sage')?.frame).toBe(0)
+    }
+    for (let i = 0; i < 60; i += 1) engine.tick(1 / 30)
+    expect(engine.agents.get('sage')?.activity).toBe('idle')
+  })
+
   test('state machine menolak transisi tidak sah; agent offline tidak bisa digerakkan', () => {
     expect(canTransition('offline', 'working')).toBe(false)
     expect(canTransition('working', 'waiting_approval')).toBe(true)
@@ -206,6 +246,188 @@ describe('simulasi Project Atlas', () => {
     }
   })
 
+  /** Jalankan simulasi sampai `predicate` benar (atau selesai/batas waktu). */
+  function runUntil(
+    engine: OfficeEngine,
+    simulation: SimulationController,
+    predicate: () => boolean,
+    seconds = 120,
+  ): boolean {
+    for (let elapsed = 0; elapsed < seconds; elapsed += 1 / 30) {
+      if (predicate()) return true
+      if (simulation.status === 'completed') return false
+      engine.tick(1 / 30)
+      simulation.update()
+    }
+    return predicate()
+  }
+  const finish = (engine: OfficeEngine, simulation: SimulationController) =>
+    runUntil(engine, simulation, () => simulation.status === 'completed', 180)
+
+  test('posisi awal ≠ tujuan fase: kelima robot benar-benar berjalan (event route) lalu tiba di tujuannya', () => {
+    const destinations: Record<string, IslandId> = {}
+    for (const phase of ATLAS_PHASES)
+      for (const action of phase.actions) if (action.moveTo) destinations[action.actor] = action.moveTo
+    for (const start of ATLAS_START) {
+      const target = destinations[start.character]
+      expect([start.character, target !== undefined && target !== start.island]).toEqual([start.character, true])
+    }
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const routes = new Map<string, number>()
+    const teleports = new Map<string, number>()
+    engine.on((event) => {
+      if (event.type === 'route') routes.set(event.key, (routes.get(event.key) ?? 0) + 1)
+      if (event.type === 'teleport' && event.phase === 'in')
+        teleports.set(event.key, (teleports.get(event.key) ?? 0) + 1)
+    })
+    const simulation = new SimulationController(engine)
+    simulation.start('riset')
+    expect(finish(engine, simulation)).toBe(true)
+    for (const character of ['nova', 'sage', 'pixel', 'bolt', 'echo']) {
+      expect([character, routes.get(`preview:${character}`) ?? 0]).not.toEqual([character, 0])
+      expect([character, teleports.get(`preview:${character}`) ?? 0]).not.toEqual([character, 0])
+      const destination = destinations[character]
+      if (!destination) throw new Error(`${character} tidak punya tujuan fase`)
+      expect(engine.agents.get(`preview:${character}`)?.island).toBe(destination)
+    }
+    expect(simulation.rejectedActions).toEqual([])
+  })
+
+  test('jeda robot saat berjalan lalu lanjutkan: rencana ditahan (tidak selesai diam-diam) dan simulasi tuntas', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const simulation = new SimulationController(engine)
+    simulation.start('riset')
+    const sage = () => engine.agents.get('preview:sage')
+    expect(runUntil(engine, simulation, () => (sage()?.route.length ?? 0) > 0 && sage()?.teleport === null)).toBe(true)
+    expect(simulation.pauseActor('preview:sage')).toBe(true)
+    expect(sage()?.activity).toBe('idle')
+    expect(sage()?.route).toEqual([])
+    const phase = simulation.phaseIndex
+    // 20 detik berlalu: fase tidak maju (ditahan), status tetap running, bukan menggantung tanpa jalan keluar.
+    for (let i = 0; i < 30 * 20; i += 1) {
+      engine.tick(1 / 30)
+      simulation.update()
+    }
+    expect(simulation.phaseIndex).toBe(phase)
+    expect(simulation.status).toBe('running')
+    expect(simulation.snapshot().heldActors).toEqual(['preview:sage'])
+    expect(simulation.resumeActor('preview:sage')).toBe(true)
+    expect(simulation.snapshot().heldActors).toEqual([])
+    expect(finish(engine, simulation)).toBe(true)
+    expect(sage()?.island).toBe('web-research')
+    expect(simulation.rejectedActions).toEqual([])
+  })
+
+  test('jeda saat transit teleport: teleport diselesaikan di portal, rencana ditahan, lanjut → tiba di tujuan', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const simulation = new SimulationController(engine)
+    simulation.start('riset')
+    const sage = () => engine.agents.get('preview:sage')
+    expect(runUntil(engine, simulation, () => sage()?.teleport?.phase === 'transit')).toBe(true)
+    simulation.pauseActor('preview:sage')
+    expect(runUntil(engine, simulation, () => sage()?.teleport === null && (sage()?.route.length ?? 0) === 0)).toBe(
+      true,
+    )
+    expect(sage()?.visible).toBe(true)
+    expect(simulation.snapshot().heldActors).toContain('preview:sage')
+    for (let i = 0; i < 30 * 5; i += 1) {
+      engine.tick(1 / 30)
+      simulation.update()
+    }
+    expect(simulation.status).toBe('running')
+    simulation.resumeActor('preview:sage')
+    expect(finish(engine, simulation)).toBe(true)
+    expect(sage()?.island).toBe('web-research')
+  })
+
+  test('jeda saat bekerja lalu lanjutkan: aktivitas diterbitkan ulang dengan durasi penuh, simulasi tuntas', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const simulation = new SimulationController(engine)
+    simulation.start('riset')
+    const sage = () => engine.agents.get('preview:sage')
+    expect(runUntil(engine, simulation, () => sage()?.activity === 'researching')).toBe(true)
+    simulation.pauseActor('preview:sage')
+    expect(sage()?.activity).toBe('idle')
+    const phase = simulation.phaseIndex
+    for (let i = 0; i < 30 * 15; i += 1) {
+      engine.tick(1 / 30)
+      simulation.update()
+    }
+    expect(simulation.phaseIndex).toBe(phase)
+    simulation.resumeActor('preview:sage')
+    expect(sage()?.activity).toBe('researching')
+    expect(finish(engine, simulation)).toBe(true)
+  })
+
+  test('jeda saat siaga (tanpa rencana): lanjutkan mengembalikan false, tidak mengubah apa pun', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const simulation = new SimulationController(engine)
+    expect(simulation.pauseActor('preview:bolt')).toBe(true)
+    expect(simulation.resumeActor('preview:bolt')).toBe(false)
+    expect(simulation.pauseActor('tidak-ada')).toBe(false)
+  })
+
+  test('reset saat bergerak dan saat dijeda: kembali ke posisi awal, lalu bisa dijalankan lagi sampai selesai', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const simulation = new SimulationController(engine)
+    const startPositions = new Map([...engine.agents.values()].map((agent) => [agent.key, { ...agent.position }]))
+    simulation.start('riset')
+    expect(runUntil(engine, simulation, () => (engine.agents.get('preview:sage')?.route.length ?? 0) > 0)).toBe(true)
+    simulation.reset(NAMES)
+    expect(simulation.status).toBe('idle')
+    for (const agent of engine.agents.values()) {
+      const start = startPositions.get(agent.key)
+      if (!start) throw new Error(`posisi awal ${agent.key} tidak tercatat`)
+      expect(agent.position).toEqual(start)
+      expect(agent.route).toEqual([])
+      expect(agent.activity).toBe('idle')
+    }
+    simulation.start('riset')
+    expect(runUntil(engine, simulation, () => (engine.agents.get('preview:sage')?.route.length ?? 0) > 0)).toBe(true)
+    simulation.pause()
+    simulation.pauseActor('preview:sage')
+    simulation.reset(NAMES)
+    expect(simulation.status).toBe('idle')
+    expect(engine.paused).toBe(false)
+    simulation.start('riset')
+    expect(finish(engine, simulation)).toBe(true)
+    expect(simulation.rejectedActions).toEqual([])
+  })
+
+  test('siklus jeda/lanjut berulang (per robot dan global) tetap tuntas tanpa menggantung', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    const simulation = new SimulationController(engine)
+    simulation.start('riset')
+    let cycles = 0
+    for (let elapsed = 0; elapsed < 400 && simulation.status !== 'completed'; elapsed += 1 / 30) {
+      engine.tick(1 / 30)
+      simulation.update()
+      // Setiap ~1,5 dtk: jeda semua robot yang sedang bergerak/bekerja, tunggu 0,5 dtk, lanjutkan; plus jeda global.
+      if (Math.round(elapsed * 30) % 45 === 0 && cycles < 12) {
+        cycles += 1
+        const keys = [...engine.agents.keys()]
+        for (const key of keys) simulation.pauseActor(key)
+        simulation.pause()
+        for (let i = 0; i < 15; i += 1) {
+          engine.tick(1 / 30)
+          simulation.update()
+        }
+        simulation.resume()
+        for (const key of keys) simulation.resumeActor(key)
+      }
+    }
+    expect(cycles).toBeGreaterThanOrEqual(10)
+    expect(simulation.status).toBe('completed')
+    expect(simulation.rejectedActions).toEqual([])
+  })
+
   test('jeda, lanjut, kecepatan, dan reset', () => {
     const engine = new OfficeEngine(world)
     engine.setAgents(atlasAgentSpecs(NAMES))
@@ -221,7 +443,9 @@ describe('simulasi Project Atlas', () => {
     expect(engine.time).toBeCloseTo(time + 0.1, 5)
     simulation.reset(NAMES)
     expect(simulation.status).toBe('idle')
-    expect(engine.agents.get('preview:sage')?.island).toBe('web-research')
+    expect(engine.agents.get('preview:sage')?.island).toBe(
+      ATLAS_START.find((start) => start.character === 'sage')?.island ?? 'mission-hub',
+    )
     expect(engine.agents.size).toBe(5)
   })
 })

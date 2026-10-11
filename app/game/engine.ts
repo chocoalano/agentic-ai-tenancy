@@ -62,7 +62,8 @@ export interface AgentRuntime {
   onArrive: ActivityPlan | null
   speech: { text: string; until: number } | null
   animationStarted: number
-  lastAnimation: AgentAnimationName
+  /** Kunci animasi terakhir (nama, atau `teleport:<fase>` agar fase keluar memulai ulang frame). */
+  lastAnimation: string
   orb: Point | null
   visible: boolean
 }
@@ -438,14 +439,17 @@ export class OfficeEngine {
         animation = 'teleport'
         reverse = agent.teleport.phase === 'out'
       } else if (leg?.kind === 'walk') animation = 'walk'
-      if (animation !== agent.lastAnimation) {
-        agent.lastAnimation = animation
+      const animationKey = agent.teleport ? `teleport:${agent.teleport.phase}` : animation
+      if (animationKey !== agent.lastAnimation) {
+        agent.lastAnimation = animationKey
         agent.animationStarted = agent.teleport ? agent.teleport.started : this.time
       }
       const definition = AGENT_ANIMATIONS[animation]
       const elapsed = this.time - agent.animationStarted
       let frame = Math.floor(elapsed * definition.fps)
-      if (this.reducedMotion && definition.loop) frame = 0
+      // Reduced motion: semua animasi (termasuk lompatan celebrate & guncangan error) diam di frame 0;
+      // perubahan state tetap terjadi.
+      if (this.reducedMotion) frame = 0
       else if (definition.loop) frame %= definition.frames
       else frame = Math.min(definition.frames - 1, frame)
       if (reverse) frame = definition.frames - 1 - frame

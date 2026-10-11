@@ -47,9 +47,22 @@ const zoom = ref(1)
 const pan = reactive({ x: 0, y: 0 })
 const dragging = ref(false)
 
+// prefers-reduced-motion dibaca setelah mount (SSR tidak tahu preferensi pengguna) → transisi kamera dimatikan.
+const reduceMotion = ref(false)
+let motionQuery: MediaQueryList | null = null
+const onMotionChange = (event: MediaQueryListEvent) => {
+  reduceMotion.value = event.matches
+}
+onMounted(() => {
+  motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reduceMotion.value = motionQuery.matches
+  motionQuery.addEventListener('change', onMotionChange)
+})
+onBeforeUnmount(() => motionQuery?.removeEventListener('change', onMotionChange))
+
 const cameraStyle = computed(() => ({
   transform: `translate3d(${pan.x.toFixed(1)}px, ${pan.y.toFixed(1)}px, 0) scale(${zoom.value.toFixed(3)})`,
-  transition: dragging.value ? 'none' : 'transform 480ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+  transition: dragging.value || reduceMotion.value ? 'none' : 'transform 480ms cubic-bezier(0.2, 0.8, 0.2, 1)',
 }))
 
 function clamp(value: number, min: number, max: number): number {
