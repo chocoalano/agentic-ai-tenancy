@@ -16,9 +16,13 @@ const AgentSummarySchema = t.Object(
     roleTitle: t.String(),
     description: t.String(),
     lifecycleStatus: t.UnionEnum(AGENT_LIFECYCLE_STATUSES),
-    runtimeStatus: t.Null({
-      description: 'Status runtime dari Agent Orchestrator. Selalu null pada Phase 1 karena runtime belum terhubung.',
+    runtimeStatus: t.Union([t.UnionEnum(['thinking', 'working', 'waiting_approval']), t.Null()], {
+      description:
+        'Status runtime otoritatif dari run aktif terbaru (queued/claimed → thinking, running → working). ' +
+        'null bila agent tidak sedang mengerjakan tugas.',
     }),
+    currentTaskId: t.Union([Uuid, t.Null()]),
+    currentRunId: t.Union([Uuid, t.Null()]),
     isSeedData: t.Boolean({ description: 'true untuk data seed pengembangan' }),
     createdAt: Timestamp,
     updatedAt: Timestamp,
@@ -38,8 +42,7 @@ export function agentRoutes(deps: { config: ApiConfig; auth: AuthService; agents
     .get(
       '',
       async ({ tenant }) => {
-        const agents = await deps.agents.list(tenant)
-        return { items: agents.map((agent) => ({ ...agent, runtimeStatus: null })) }
+        return { items: await deps.agents.list(tenant) }
       },
       {
         tenant: 'agents.read',
@@ -51,18 +54,14 @@ export function agentRoutes(deps: { config: ApiConfig; auth: AuthService; agents
         },
       },
     )
-    .get(
-      '/:id',
-      async ({ tenant, params }) => ({ ...(await deps.agents.get(tenant, params.id)), runtimeStatus: null }),
-      {
-        tenant: 'agents.read',
-        params: IdParams,
-        response: { 200: AgentDetailSchema, ...tenantErrors, 404: ApiErrorSchema, ...validationErrors },
-        detail: {
-          summary: 'Detail AI employee',
-          description: 'Mengembalikan 404 bila agent tidak ada di tenant aktif (termasuk agent milik tenant lain).',
-          security: TENANT_SECURITY,
-        },
+    .get('/:id', ({ tenant, params }) => deps.agents.get(tenant, params.id), {
+      tenant: 'agents.read',
+      params: IdParams,
+      response: { 200: AgentDetailSchema, ...tenantErrors, 404: ApiErrorSchema, ...validationErrors },
+      detail: {
+        summary: 'Detail AI employee',
+        description: 'Mengembalikan 404 bila agent tidak ada di tenant aktif (termasuk agent milik tenant lain).',
+        security: TENANT_SECURITY,
       },
-    )
+    })
 }

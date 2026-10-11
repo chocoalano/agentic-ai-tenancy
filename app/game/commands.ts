@@ -28,7 +28,8 @@ export const AGENT_COMMANDS: readonly CommandDefinition[] = [
     key: 'assign_task',
     label: 'Tugaskan',
     kind: 'business',
-    live: { supported: false, reason: 'Butuh modul tugas & Agent Orchestrator (belum ada endpoint).' },
+    // Phase 5: membuat tugas NYATA (POST /v1/tasks) — panel menonaktifkannya bila runtime/izin tidak tersedia.
+    live: { supported: true, reason: 'Membuat tugas nyata untuk AI employee ini (dieksekusi worker + runtime).' },
     preview: true,
   },
   {

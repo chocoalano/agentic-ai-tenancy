@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ArrowUpRight, Lock, MapPin, Send, X } from '@lucide/vue'
+import { ArrowUpRight, Ban, FileText, Lock, MapPin, Send, X } from '@lucide/vue'
+import { isTerminalTaskStatus } from '~~/domains/tasks/types'
 import type { OfficeAgentView } from '~/composables/useOfficeEngine'
 import { AGENT_COMMANDS, type CommandDefinition } from '~/game/commands'
 import type { IslandId } from '~/game/world'
-import type { AgentSummary } from '~/utils/api-types'
+import type { AgentSummary, ApprovalItem, RunOutput, TaskCapabilities, TaskItem } from '~/utils/api-types'
 import { CHARACTERS, centeringShift } from '~/utils/game-assets'
 import { isWalkableIsland } from '~/game/world'
 import { MISSION_HUB, STATIONS } from '~/utils/office-layout'
@@ -13,10 +14,26 @@ import { MISSION_HUB, STATIONS } from '~/utils/office-layout'
  *
  * Membedakan dengan jelas:
  * - perintah VISUAL (pindah, lihat aktivitas, profil) — dijalankan frontend;
- * - perintah BISNIS (tugaskan, chat, jeda/lanjut) — di mode live dinonaktifkan
- *   karena backend belum menyediakan endpoint-nya; di mode pratinjau berjalan
- *   sebagai SIMULASI berlabel. Tidak ada respons AI yang dikarang.
+ * - perintah BISNIS: di mode LIVE "Tugaskan" membuat tugas NYATA lewat
+ *   `POST /v1/tasks` (hanya bila runtime tersedia & pengguna berizin); status,
+ *   hasil, dan persetujuan ditampilkan dari backend. Chat/jeda/lanjut tetap
+ *   nonaktif (belum ada endpoint). Di mode pratinjau semua berjalan sebagai
+ *   SIMULASI berlabel. Tidak ada respons AI yang dikarang.
  */
+export interface LivePanelState {
+  capabilities: TaskCapabilities | null
+  tasks: TaskItem[]
+  currentTask: TaskItem | null
+  pendingApproval: ApprovalItem | null
+  result: RunOutput | null
+  resultError: string | null
+  submitting: boolean
+  error: string | null
+  loading: boolean
+  canDecide: boolean
+  canCancel: boolean
+}
+
 const props = defineProps<{
   agent: OfficeAgentView
   preview: boolean
@@ -26,12 +43,18 @@ const props = defineProps<{
   feedback: string | null
   /** Mode live: status dikonfirmasi realtime vs status terakhir yang dikonfirmasi. */
   confirmation?: string | null
+  /** Mode live: tugas, kemampuan runtime, persetujuan, dan hasil dari backend. */
+  live?: LivePanelState | null
 }>()
 
 const emit = defineEmits<{
   close: []
   move: [island: IslandId]
   instruct: [text: string]
+  assign: [text: string, options: { requiresApproval: boolean }]
+  cancelTask: [taskId: string]
+  viewResult: [runId: string]
+  decide: [approvalId: string, decision: 'approve' | 'reject']
   pauseAgent: []
   resumeAgent: []
   runAtlas: []
@@ -68,14 +91,57 @@ const SUGGESTIONS: Record<string, string> = {
   echo: 'Echo, jalankan tool yang diperlukan.',
 }
 
+/* ---------- Mode live: prasyarat penugasan nyata ---------- */
+const live = computed(() => (props.preview ? null : (props.live ?? null)))
+const runtimeAvailable = computed(() => live.value?.capabilities?.runtime.available ?? false)
+const runtimeLabel = computed(() => {
+  const runtime = live.value?.capabilities?.runtime
+  if (!runtime) return RUNTIME_DISCONNECTED.label
+  if (!runtime.available) return 'Runtime AI belum dikonfigurasi'
+  return runtime.kind === 'fixture' ? `Fixture (bukan AI) · ${runtime.model}` : `${runtime.provider} · ${runtime.model}`
+})
+const agentAssignable = computed(() => props.liveAgent?.lifecycleStatus === 'active')
+const currentTask = computed(() => live.value?.currentTask ?? null)
+const taskActive = computed(() => currentTask.value !== null && !isTerminalTaskStatus(currentTask.value.status))
+/** "Tugaskan" aktif hanya bila: live, runtime tersedia, pengguna berizin, agent aktif, tidak sedang mengerjakan tugas. */
+const canAssign = computed(
+  () =>
+    live.value !== null &&
+    runtimeAvailable.value &&
+    (live.value.capabilities?.canCreate ?? false) &&
+    agentAssignable.value &&
+    !taskActive.value,
+)
+const assignBlockedReason = computed(() => {
+  if (!live.value) return null
+  if (!live.value.capabilities)
+    return live.value.loading ? 'Memeriksa kemampuan runtime…' : 'Kemampuan runtime tidak dapat dibaca.'
+  if (!runtimeAvailable.value) return 'Runtime AI belum dikonfigurasi di server (AI_RUNTIME_PROVIDER).'
+  if (!live.value.capabilities.canCreate) return 'Peran Anda tidak memiliki izin tasks.create.'
+  if (!agentAssignable.value) return 'AI employee ini belum aktif.'
+  if (taskActive.value) return 'Agent sedang mengerjakan tugas; tunggu selesai atau batalkan.'
+  return null
+})
+const inputEnabled = computed(() => props.preview || canAssign.value)
+/** Opsi tugas nyata: hasil ditahan sampai disetujui manusia (persetujuan dicatat di backend). */
+const requiresApproval = ref(false)
+const maxChars = computed(() => live.value?.capabilities?.limits.maxInstructionChars ?? 4000)
+
 function available(command: CommandDefinition): boolean {
-  return props.preview ? command.preview : command.live.supported
+  if (props.preview) return command.preview
+  if (command.key === 'assign_task') return canAssign.value
+  return command.live.supported
+}
+
+function liveReason(command: CommandDefinition): string {
+  if (command.key === 'assign_task') return assignBlockedReason.value ?? 'Membuat tugas nyata untuk AI employee ini.'
+  return command.live.reason
 }
 
 function run(command: CommandDefinition) {
   if (!available(command)) return
   if (command.key === 'assign_task' || command.key === 'chat') {
-    instruction.value ||= SUGGESTIONS[props.agent.character] ?? ''
+    if (props.preview) instruction.value ||= SUGGESTIONS[props.agent.character] ?? ''
     nextTick(() => input.value?.focus())
   } else if (command.key === 'move') showMove.value = !showMove.value
   else if (command.key === 'inspect') showLog.value = !showLog.value
@@ -87,10 +153,25 @@ function run(command: CommandDefinition) {
 
 function submit() {
   const text = instruction.value.trim()
-  if (!text || !props.preview) return
-  emit('instruct', text)
-  instruction.value = ''
+  if (!text) return
+  if (props.preview) {
+    emit('instruct', text)
+    instruction.value = ''
+    return
+  }
+  if (!canAssign.value || live.value?.submitting) return
+  emit('assign', text, { requiresApproval: requiresApproval.value })
 }
+
+// Kosongkan kolom hanya setelah tugas nyata benar-benar tercatat (bukan saat gagal).
+watch(
+  () => live.value?.tasks.length ?? 0,
+  (count, previous) => {
+    if (!props.preview && count > previous && !live.value?.error) instruction.value = ''
+  },
+)
+
+const formatter = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short' })
 </script>
 
 <template>
@@ -121,6 +202,9 @@ function submit() {
         <p class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-office-cyan">
           {{ preview ? 'Karakter pratinjau' : 'AI employee' }}
           <span v-if="preview" class="demo-tag">SIMULASI</span>
+          <span v-else-if="live?.capabilities?.runtime.kind === 'fixture'" class="demo-tag" data-runtime-fixture-tag>
+            FIXTURE · BUKAN AI
+          </span>
         </p>
         <h3 :id="titleId" class="truncate font-heading text-lg font-bold">{{ agent.name }}</h3>
         <p class="truncate text-xs text-office-cyan">{{ roleTitle }}</p>
@@ -134,7 +218,7 @@ function submit() {
       </div>
       <div class="hud-segment px-2 py-1">
         <dt class="text-muted-foreground">Runtime</dt>
-        <dd class="truncate font-semibold">{{ preview ? 'Simulasi frontend' : RUNTIME_DISCONNECTED.label }}</dd>
+        <dd class="truncate font-semibold" data-agent-runtime>{{ preview ? 'Simulasi frontend' : runtimeLabel }}</dd>
       </div>
       <div class="hud-segment px-2 py-1">
         <dt class="text-muted-foreground">Workstation</dt>
@@ -145,16 +229,20 @@ function submit() {
       <div class="hud-segment px-2 py-1">
         <dt class="text-muted-foreground">Penugasan</dt>
         <dd class="truncate font-semibold" data-agent-assignment>
-          {{
-            preview
-              ? (agent.workstationActivity ?? (agent.acknowledging ? 'Menerima perintah…' : agent.label))
-              : 'Belum ada (modul tugas belum tersedia)'
-          }}
+          <template v-if="preview">
+            {{ agent.workstationActivity ?? (agent.acknowledging ? 'Menerima perintah…' : agent.label) }}
+          </template>
+          <template v-else-if="currentTask"
+            >{{ TASK_STATUS_LABELS[currentTask.status] }} · {{ currentTask.title }}</template
+          >
+          <template v-else>Tidak ada tugas aktif</template>
         </dd>
       </div>
       <div class="hud-segment px-2 py-1">
         <dt class="text-muted-foreground">Model AI</dt>
-        <dd class="font-semibold text-muted-foreground">—</dd>
+        <dd class="truncate font-semibold text-muted-foreground">
+          {{ !preview && live?.capabilities?.runtime.available ? live.capabilities.runtime.model : '—' }}
+        </dd>
       </div>
     </dl>
     <p v-if="!preview && confirmation" class="mt-1 text-[10.5px] text-muted-foreground" data-live-confirmation>
@@ -200,7 +288,7 @@ function submit() {
                 command.kind === 'business' ? 'Simulasi pratinjau — tidak ada eksekusi nyata.' : 'Aksi visual frontend.'
               }}
             </template>
-            <template v-else>{{ command.live.reason }}</template>
+            <template v-else>{{ liveReason(command) }}</template>
           </TooltipContent>
         </Tooltip>
       </li>
@@ -224,7 +312,7 @@ function submit() {
       </p>
     </div>
 
-    <!-- Persetujuan (pratinjau saja; mode live belum punya modul persetujuan) -->
+    <!-- Persetujuan simulasi (pratinjau saja) -->
     <div
       v-if="preview && agent.activity === 'waiting_approval'"
       class="mt-2.5 rounded-lg border border-office-orange/60 bg-office-orange/10 p-2"
@@ -254,6 +342,92 @@ function submit() {
       </div>
     </div>
 
+    <!-- Mode live: tugas saat ini (data backend) -->
+    <div
+      v-if="live && currentTask"
+      class="mt-2.5 rounded-lg border border-office-cyan/40 bg-office-cyan/5 p-2"
+      :data-live-task="currentTask.id"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <p class="truncate text-xs font-semibold">{{ currentTask.title }}</p>
+        <span
+          class="shrink-0 rounded bg-office-cyan/20 px-1.5 text-[10px] font-bold"
+          :data-live-task-status="currentTask.status"
+        >
+          {{ TASK_STATUS_LABELS[currentTask.status] }}
+        </span>
+      </div>
+      <p class="mt-0.5 text-[10.5px] text-muted-foreground">
+        Percobaan {{ currentTask.attempts }}/{{ currentTask.maxAttempts }} ·
+        {{ currentTask.latestRun ? RUN_STATUS_LABELS[currentTask.latestRun.status] : '—' }} ·
+        {{ formatter.format(currentTask.createdAt) }}
+      </p>
+      <p v-if="currentTask.errorMessage" class="mt-0.5 text-[10.5px] text-destructive" data-live-task-error>
+        {{ currentTask.errorCode }} · {{ currentTask.errorMessage }}
+      </p>
+      <div class="mt-1.5 flex flex-wrap gap-1.5">
+        <Button
+          v-if="live.canCancel && !isTerminalTaskStatus(currentTask.status)"
+          size="sm"
+          variant="secondary"
+          class="h-7 gap-1 rounded-lg px-2.5 text-[11px]"
+          data-live-cancel
+          @click="emit('cancelTask', currentTask.id)"
+        >
+          <Ban class="size-3" aria-hidden="true" />Batalkan
+        </Button>
+        <Button
+          v-if="currentTask.status === 'completed' && currentTask.latestRun"
+          size="sm"
+          class="h-7 gap-1 rounded-lg px-2.5 text-[11px]"
+          data-live-view-result
+          @click="emit('viewResult', currentTask.latestRun.id)"
+        >
+          <FileText class="size-3" aria-hidden="true" />Lihat hasil
+        </Button>
+        <NuxtLink
+          :to="`/tasks/${currentTask.id}`"
+          class="hud-segment inline-flex h-7 items-center gap-1 px-2 text-[11px]"
+        >
+          Detail <ArrowUpRight class="size-3" aria-hidden="true" />
+        </NuxtLink>
+      </div>
+      <div
+        v-if="live.pendingApproval"
+        class="mt-2 rounded-md border border-office-orange/60 bg-office-orange/10 p-2"
+        data-live-approval
+      >
+        <p class="text-[11px] font-semibold">Persetujuan dibutuhkan</p>
+        <p class="text-[10.5px] text-muted-foreground">{{ live.pendingApproval.actionSummary }}</p>
+        <div v-if="live.canDecide" class="mt-1 flex gap-1.5">
+          <Button
+            size="sm"
+            class="h-6 rounded-md px-2 text-[10.5px]"
+            data-live-approve
+            @click="emit('decide', live.pendingApproval.id, 'approve')"
+            >Setujui</Button
+          >
+          <Button
+            size="sm"
+            variant="secondary"
+            class="h-6 rounded-md px-2 text-[10.5px]"
+            data-live-reject
+            @click="emit('decide', live.pendingApproval.id, 'reject')"
+            >Tolak</Button
+          >
+        </div>
+        <p v-else class="text-[10.5px] text-muted-foreground">Butuh izin approvals.decide.</p>
+      </div>
+      <p v-if="live.resultError" class="mt-1 text-[10.5px] text-destructive" data-live-result-error>
+        {{ live.resultError }}
+      </p>
+      <pre
+        v-if="live.result && live.result.taskId === currentTask.id"
+        class="mt-1.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-office-bg/70 p-2 text-[11px] leading-snug"
+        data-live-result
+        >{{ live.result.content }}</pre>
+    </div>
+
     <!-- Instruksi -->
     <form class="mt-2.5" @submit.prevent="submit">
       <Label :for="inputId" class="text-xs">Instruksi</Label>
@@ -263,9 +437,16 @@ function submit() {
           ref="input"
           v-model="instruction"
           rows="2"
-          :disabled="!preview"
+          :disabled="!inputEnabled"
+          :maxlength="preview ? undefined : maxChars"
           class="min-h-10 flex-1 resize-none rounded-lg border border-white/15 bg-[oklch(0.14_0.05_266/80%)] px-2.5 py-1.5 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-office-cyan disabled:cursor-not-allowed disabled:opacity-60"
-          :placeholder="preview ? SUGGESTIONS[agent.character] : 'Eksekusi tugas belum tersedia di mode live'"
+          :placeholder="
+            preview
+              ? SUGGESTIONS[agent.character]
+              : canAssign
+                ? 'Tulis tugas nyata untuk AI employee ini…'
+                : (assignBlockedReason ?? 'Eksekusi tugas belum tersedia di mode live')
+          "
           data-instruction-input
           @keydown.enter.exact.prevent="submit"
         />
@@ -273,20 +454,45 @@ function submit() {
           type="submit"
           size="icon"
           class="size-10 shrink-0"
-          :disabled="!preview || !instruction.trim()"
+          :disabled="!inputEnabled || !instruction.trim() || (live?.submitting ?? false)"
           aria-label="Kirim instruksi"
+          data-instruction-submit
         >
           <Send class="size-4" aria-hidden="true" />
         </Button>
       </div>
+      <label
+        v-if="!preview"
+        class="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[10.5px] text-muted-foreground"
+        data-live-approval-toggle
+      >
+        <Checkbox
+          :model-value="requiresApproval"
+          :disabled="!canAssign"
+          aria-label="Hasil perlu persetujuan manusia sebelum dirilis"
+          data-live-requires-approval
+          @update:model-value="(value) => (requiresApproval = value === true)"
+        />
+        Hasil perlu persetujuan manusia sebelum dirilis
+      </label>
       <p class="mt-1 text-[10.5px] text-muted-foreground">
         <template v-if="preview">
           Pratinjau: kata kunci instruksi menggerakkan simulasi frontend (bukan AI). Perintah riset/koordinasi ke Nova
           memulai misi Project Atlas; “minta persetujuan” memicu permintaan persetujuan.
         </template>
-        <template v-else>
-          Perintah bisnis dinonaktifkan: backend belum menyediakan modul tugas, orchestrator, dan inferensi AI.
+        <template v-else-if="live?.submitting">Mengirim tugas ke server…</template>
+        <template v-else-if="canAssign">
+          Tugas nyata: dieksekusi worker lewat runtime yang dikonfigurasi server; status dan hasil datang dari backend.
         </template>
+        <template v-else>{{ assignBlockedReason ?? 'Perintah bisnis dinonaktifkan.' }}</template>
+      </p>
+      <p
+        v-if="live?.error"
+        class="mt-1 rounded-md bg-destructive/15 px-2 py-1 text-[11px] text-destructive"
+        role="alert"
+        data-live-error
+      >
+        {{ live.error }}
       </p>
       <p
         v-if="feedback"
@@ -297,6 +503,17 @@ function submit() {
         {{ feedback }}
       </p>
     </form>
+
+    <!-- Riwayat tugas (live) -->
+    <div v-if="live && live.tasks.length > 0" class="mt-2.5">
+      <p class="text-xs font-semibold">Riwayat tugas</p>
+      <ol class="mt-1 space-y-0.5 text-[11px] text-muted-foreground" data-live-task-history>
+        <li v-for="task in live.tasks.slice(0, 5)" :key="task.id" class="flex items-center justify-between gap-2">
+          <NuxtLink :to="`/tasks/${task.id}`" class="truncate hover:text-foreground">{{ task.title }}</NuxtLink>
+          <span class="shrink-0" :data-history-status="task.status">{{ TASK_STATUS_LABELS[task.status] }}</span>
+        </li>
+      </ol>
+    </div>
 
     <!-- Aktivitas -->
     <div v-if="showLog" class="mt-2.5">

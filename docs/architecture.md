@@ -71,8 +71,9 @@ terjangkau menjawab 503 (bukan 500/menggantung).
 
 ```text
 api/                    Backend Elysia (tanpa alias/auto-import Nuxt; import relatif)
-├── index.ts            Factory nuxt-elysia (sinkron, tanpa .listen())
+├── index.ts            Factory nuxt-elysia (sinkron, tanpa .listen(); worker inline opsional setelah kesiapan)
 ├── standalone.ts       Menjalankan API yang sama sebagai server Elysia mandiri
+├── worker.ts           Entry worker eksekusi agent mandiri (bun run worker)
 ├── app.ts              createApi(deps): perakitan plugin & route, export type Api
 ├── container.ts        Komposisi dependensi manual + readiness gate
 ├── core/
@@ -82,8 +83,10 @@ api/                    Backend Elysia (tanpa alias/auto-import Nuxt; import rel
 │   ├── tenancy/        resolveTenantContext (keanggotaan → peran → izin)
 │   ├── security/       Proteksi CSRF (Fetch Metadata/Origin), pembatas laju atomik (login/registrasi/tenant)
 │   ├── http/           Plugin global (request id, header, CSRF, gerbang kesiapan, error), IP klien, logger
+│   ├── runtime/        AI Runtime Interface + adapter (none, fixture, openai-compatible/DigitalOcean)
 │   └── errors/         AppError + schema ApiError
-├── modules/            health, auth, users, tenants, memberships, agents, realtime
+├── modules/            health, auth, users, tenants, memberships, agents, tasks, runs (+worker), approvals,
+│                       realtime (routes SSE, hub poller, outbox)
 └── shared/             Schema TypeBox bersama
 domains/                Tipe & aturan domain murni (dipakai backend & frontend)
 db/                     migrations/*.sql, migrator.ts, seeds/development.ts
@@ -124,10 +127,12 @@ menerima pool `SQL` langsung karena tabelnya tidak tenant-scoped; pembuatan tena
 
 ## Realtime
 
-| Kanal              | Status Phase 1                                                                                 |
-| ------------------ | ---------------------------------------------------------------------------------------------- |
-| SSE                | **Berfungsi** di dev & production melalui mount: `GET /api/v1/realtime/stream` (auth + tenant) |
-| WebSocket (Elysia) | **Tidak berfungsi melalui mount nuxt-elysia** (terverifikasi), berfungsi di mode standalone    |
+| Kanal              | Status Phase 1                                                                                                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SSE                | **Berfungsi** di dev & production melalui mount: `GET /api/v1/realtime/stream` (auth + tenant)                                                                                                                |
+| Outbox + replay    | Phase 5: event bisnis ditulis ke `realtime_outbox` dalam transaksi yang sama, hub mem-polling per proses, `Last-Event-ID` diputar ulang; otorisasi divalidasi ulang berkala (`docs/secure-agent-realtime.md`) |
+| Worker eksekusi    | Phase 5: antrean PostgreSQL (`FOR UPDATE SKIP LOCKED` + lease), proses mandiri `bun run worker` atau inline (`docs/agent-worker-operations.md`)                                                               |
+| WebSocket (Elysia) | **Tidak berfungsi melalui mount nuxt-elysia** (terverifikasi), berfungsi di mode standalone                                                                                                                   |
 
 Hasil eksperimen WebSocket (route `.ws()` probe sementara, sudah dihapus):
 

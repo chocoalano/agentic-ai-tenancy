@@ -1,5 +1,5 @@
 import type { AgentLifecycleStatus } from '../../../domains/agents/types'
-import type { TenantTransaction } from '../../core/database/transactions'
+import type { TenantScope } from '../../core/database/transactions'
 
 export interface AgentSummary {
   id: string
@@ -56,24 +56,35 @@ function toAgentSummary(row: AgentRow): AgentSummary {
  * eksplisit di query bersifat defense-in-depth; isolasi utama adalah RLS.
  */
 export const agentsRepository = {
-  async list(scope: TenantTransaction): Promise<AgentSummary[]> {
+  async list(scope: TenantScope): Promise<AgentSummary[]> {
     const rows = await scope.sql<AgentRow[]>`
       select id, slug, name, role_key, role_title, description, lifecycle_status, is_seed_data, created_at, updated_at
       from agents
-      where tenant_id = ${scope.context.tenantId}
+      where tenant_id = ${scope.tenantId}
         and lifecycle_status <> 'archived'
       order by name
     `
     return rows.map(toAgentSummary)
   },
 
-  async findById(scope: TenantTransaction, agentId: string): Promise<AgentDetail | null> {
+  /** Termasuk agent yang diarsipkan (untuk nama pada riwayat tugas). */
+  async listIncludingArchived(scope: TenantScope): Promise<AgentSummary[]> {
+    const rows = await scope.sql<AgentRow[]>`
+      select id, slug, name, role_key, role_title, description, lifecycle_status, is_seed_data, created_at, updated_at
+      from agents
+      where tenant_id = ${scope.tenantId}
+      order by name
+    `
+    return rows.map(toAgentSummary)
+  },
+
+  async findById(scope: TenantScope, agentId: string): Promise<AgentDetail | null> {
     const [row] = await scope.sql<AgentDetailRow[]>`
       select id, slug, name, role_key, role_title, description, main_instruction, lifecycle_status,
              is_seed_data, created_at, updated_at
       from agents
       where id = ${agentId}
-        and tenant_id = ${scope.context.tenantId}
+        and tenant_id = ${scope.tenantId}
     `
     return row ? { ...toAgentSummary(row), mainInstruction: row.main_instruction } : null
   },

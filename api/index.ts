@@ -16,10 +16,26 @@
  */
 import { createApi } from './app'
 import { loadApiConfig } from './core/config/env'
-import { createDependencies } from './container'
+import { createDependencies, createReadinessGate } from './container'
+import { createExecutionWorker } from './modules/runs/worker'
 
 export default function createElysiaApp() {
   const config = loadApiConfig()
   const deps = createDependencies({ config })
-  return createApi(deps)
+  const readiness = createReadinessGate(deps)
+  if (config.worker.inline) {
+    // Worker in-process (instance tunggal/pengembangan): mulai hanya setelah database & role terverifikasi.
+    const worker = createExecutionWorker(deps)
+    void readiness.waitUntilReady().then(
+      () => worker.start(),
+      (error) => deps.logger.error('Worker inline tidak dimulai: database belum siap', { error: String(error) }),
+    )
+    const shutdown = () => {
+      void worker.stop()
+      deps.realtimeHub.stop()
+    }
+    process.once('SIGTERM', shutdown)
+    process.once('SIGINT', shutdown)
+  }
+  return createApi(deps, { readiness })
 }

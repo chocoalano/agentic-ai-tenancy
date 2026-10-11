@@ -1,87 +1,86 @@
 # Pemetaan Event Agent Live
 
 Mode **live** menampilkan AI employee nyata milik tenant aktif. Backend adalah sumber kebenaran untuk identitas,
-kepemilikan tenant, izin, penugasan, status run, persetujuan, biaya, dan hasil bisnis. Frontend hanya memetakan data
-dan event yang **benar-benar ada** ke aksi visual. Tidak ada aktivitas yang dikarang ketika event tidak tersedia.
+kepemilikan tenant, izin, penugasan, status run, persetujuan, dan hasil. Frontend hanya memetakan data dan event yang
+**benar-benar ada** ke aksi visual. Tidak ada aktivitas yang dikarang ketika event tidak tersedia.
 
-Adaptor bertipe: `app/game/live-adapter.ts`. Kontrak event: `domains/office/realtime.ts`.
+Adaptor bertipe: `app/game/live-adapter.ts`. Kontrak event: `domains/office/realtime.ts`. Sejak Phase 5, event
+bisnis agent benar-benar dipancarkan backend (outbox transaksional → SSE); rincian integrasi game ada di
+`docs/game-live-event-integration.md`, keamanan transport di `docs/secure-agent-realtime.md`.
 
-## 1. Sumber data live saat ini
+## 1. Sumber data live
 
-| Sumber                                   | Isi yang dipakai                                                    | Pemakaian di game                                              |
-| ---------------------------------------- | ------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `GET /api/v1/agents` (Eden, SSR + klien) | `id`, `name`, `roleTitle`, `lifecycleStatus`, `runtimeStatus: null` | daftar robot, nama, peran; status visual dari `liveActivity()` |
-| `GET /api/v1/tenants/:id`                | data tenant aktif                                                   | HUD                                                            |
-| `GET /api/v1/realtime/stream` (SSE)      | event `ready`, `heartbeat`                                          | sinkron ulang dan konfirmasi status (tabel di bawah)           |
+| Sumber                                                               | Isi yang dipakai                                                                               | Pemakaian di game                                            |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `GET /api/v1/agents` (Eden, SSR + klien)                             | `id`, `name`, `roleTitle`, `lifecycleStatus`, `runtimeStatus`, `currentTaskId`, `currentRunId` | daftar robot, nama, peran; status awal dari `liveActivity()` |
+| `GET /api/v1/tasks/capabilities`                                     | runtime (`available`, `kind`, `provider`, `model`), `canCreate`, `canCancel`, batas            | gating tombol Tugaskan + label runtime jujur                 |
+| `GET /api/v1/tasks?agentId=`, `GET /api/v1/approvals?status=pending` | tugas agent terpilih, persetujuan tertunda                                                     | kartu tugas, riwayat, blok persetujuan                       |
+| `GET /api/v1/runs/:id/output`                                        | isi hasil (hanya bila dirilis)                                                                 | tombol "Lihat hasil"                                         |
+| `GET /api/v1/tenants/:id`                                            | data tenant aktif                                                                              | HUD                                                          |
+| `GET /api/v1/realtime/stream` (SSE)                                  | `ready`, `heartbeat`, `closed`, `agent.*`, `approval.*`                                        | sinkron ulang, konfirmasi, animasi (tabel §2)                |
 
-Status visual live (`liveActivity`): agent `active` → `idle` (Siaga); `paused`/`draft`/`archived` → `offline`
-(sprite grayscale). `runtimeStatus` selalu `null` di Phase 1 karena belum ada runtime/orchestrator, sehingga robot live
-tidak pernah tampil "bekerja", "meriset", dan sebagainya.
+Status visual live (`liveActivity(lifecycle, runtimeStatus)`): agent bukan `active` → `offline` (sprite grayscale);
+`runtimeStatus` `thinking`/`working`/`waiting_approval` → state yang sama; tidak ada run aktif → `idle`.
+`runtimeStatus` diturunkan backend dari run aktif agent (`runtimeStatusOfRun`), bukan dari timer frontend.
 
 Penempatan robot di workstation dan pemilihan karakter (Nova/Sage/…) adalah **pemetaan presentasi** deterministik
 (`buildOfficeScene` → `liveAgentSpecs`), bukan penugasan bisnis.
 
-## 2. Event yang dipetakan (nyata)
+## 2. Event yang dipetakan (`mapRealtimeEvent`)
 
-| Event SSE   | Data                                                            | Aksi game (`mapRealtimeEvent`)                                                                                                                                                                   |
-| ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `ready`     | `tenantId`, `connectionId`, `serverTime`, `heartbeatIntervalMs` | `resync`: muat ulang snapshot agent dari API (`refresh()` → `engine.setAgents`), lalu `confirm(serverTime)`; bila `tenantId` ≠ tenant aktif tab → `useAuth().revalidate()` (tab usang, lihat §6) |
-| `heartbeat` | `serverTime`                                                    | `confirm(serverTime)`: perbarui waktu konfirmasi terakhir                                                                                                                                        |
+| Event SSE                        | Data penting                                        | Aksi game                                                                                                     |
+| -------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `ready`                          | `tenantId`, `lastEventId`, `replayed`, `serverTime` | `resync` (muat ulang snapshot bila `replayed=false`) + `confirm`; `tenantId` ≠ tab → `useAuth().revalidate()` |
+| `heartbeat`                      | `serverTime`                                        | `confirm`                                                                                                     |
+| `closed`                         | `reason`                                            | `closed` → revalidasi auth, reconnect hanya bila masih berhak                                                 |
+| `agent.task.created`             | `agentId`, `taskId`, `title`                        | `acknowledge`: balon "Perintah diterima", state `thinking`                                                    |
+| `agent.task.queued`              | `agentId`, `taskId`                                 | `queued`: state `thinking`                                                                                    |
+| `agent.run.started` / `activity` | `runId`, `activity`                                 | `work`: ke stasiun rumah bila perlu, state kerja per peran (`workActivityFor`), balon aktivitas               |
+| `agent.run.waiting_approval`     | `approvalId`, `actionSummary`                       | `wait_approval`: state `waiting_approval`                                                                     |
+| `agent.run.completed`            | `released`, `outputType`                            | `complete`: state `completed` 2 s → `idle`; balon "hasil tersedia" bila `released`                            |
+| `agent.run.failed`               | `errorCode`, `errorMessage`, `retryScheduled`       | `fail`: state `failed` 2,5 s → `thinking` (akan diulang) atau `idle`                                          |
+| `agent.run.canceled`             | —                                                   | `cancel`: state `idle`                                                                                        |
+| `approval.requested` / `decided` | `approvalId`, `approvalStatus`                      | `task_changed`: muat ulang tugas/persetujuan                                                                  |
+
+Semua aksi hanya memanggil mesin (`setActivity`/`moveTo`/`say`) sebagai presentasi dan memicu pembacaan ulang data
+API (`liveRefresh`, `resync`); status bisnis tidak pernah diubah oleh frontend.
 
 **Sinkronisasi ulang saat (re)koneksi.** Transport SSE (`app/utils/realtime-sse.ts`) menyambung ulang dengan
-exponential backoff (1 s → 30 s); 401/403 tidak dicoba ulang. Setiap koneksi baru diawali `ready`, sehingga snapshot
-selalu disinkronkan ulang setelah terputus. `setAgents` mempertahankan posisi robot yang sudah ada dan hanya
-memperbarui nama, karakter, dan status otoritatif; agent yang dihapus hilang, agent baru muncul di posisinya.
+exponential backoff (1 s → 30 s), mengirim `Last-Event-ID` terakhir, dan tidak mencoba ulang 401/403. Server memutar
+ulang event yang terlewat (≤ 500) atau menandai `replayed=false` sehingga klien memuat ulang snapshot.
 
-**Status terakhir yang dikonfirmasi.** Bila stream terputus:
+**Status terakhir yang dikonfirmasi.** Bila stream terputus: robot tetap menampilkan status otoritatif terakhir;
+HUD menampilkan "Menyambung ulang…" / "Realtime terputus" beserta waktu heartbeat terakhir; panel menampilkan
+`confirmationLabel()`.
 
-- robot tetap menampilkan status otoritatif terakhir dari API (tanpa aktivitas karangan);
-- indikator HUD menampilkan "Menyambung ulang…" / "Realtime terputus" beserta waktu heartbeat terakhir (tooltip);
-- panel perintah live menampilkan `confirmationLabel()`: "Status live terkonfirmasi · 11.25.38" saat terhubung,
-  "Menampilkan status terakhir yang dikonfirmasi · …" saat terputus, atau "Belum ada konfirmasi realtime".
+## 3. Event yang belum ada
 
-Terverifikasi di browser (tenant Nusantara Digital, 4 agent nyata): 2 `idle`, 2 `offline`, konfirmasi tampil di panel,
-perintah bisnis nonaktif, kontrol persetujuan tidak tampil, dan pemindahan visual tidak mengirim request tulis.
-
-## 3. Event masa depan (BELUM ADA di backend)
-
-Event berikut dari brief **tidak** dipancarkan backend Phase 1 dan **tidak** diimplementasikan di adaptor. Tabel ini
-adalah kontrak usulan agar adaptor dapat diperluas tanpa mengubah mesin. Semua event baru wajib masuk ke
-`OfficeRealtimeEvent` (domains), dikirim per tenant oleh server, dan hanya membawa data yang aman ditampilkan (tanpa
-penalaran model/chain-of-thought).
-
-| Event usulan           | Data minimal                                       | Aksi game yang direncanakan                                                       | Prasyarat backend                         |
-| ---------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------- |
-| `agent.status.changed` | `agentId`, `lifecycleStatus`, `runtimeStatus`      | perbarui state (`idle`/`offline`/`thinking`/…) via `liveActivity`                 | kolom runtime status + publisher event    |
-| `agent.run.started`    | `agentId`, `runId`, `taskId?`, `workstation?`      | `moveTo(workstation)` lalu `working`                                              | AI Runtime Interface + Agent Orchestrator |
-| `agent.run.step`       | `runId`, `kind` (research/tool/write), `summary`   | aktivitas sesuai `kind` + ringkasan aman di log (bukan penalaran model)           | orchestrator dengan langkah teraudit      |
-| `task.updated`         | `taskId`, `status`, `assigneeId`                   | indikator workstation/misi                                                        | modul tugas                               |
-| `approval.created`     | `approvalId`, `agentId`, `action`                  | `waiting_approval` + notifikasi + kontrol persetujuan (bila RBAC mengizinkan)     | modul persetujuan + audit                 |
-| `agent.run.completed`  | `runId`, `status` (succeeded/failed), `resultRef?` | `completed` (celebrate) atau `failed` (error), lalu `idle`; hasil dapat diperiksa | orchestrator + penyimpanan hasil          |
-
-Aturan: status bisnis hanya berubah karena event/data backend yang terkonfirmasi, bukan timer frontend. `moving`
-tetap state visual sementara.
+Backend belum memancarkan: perubahan status siklus hidup agent (`agent.status.changed`), langkah tool/riset
+granular (`agent.run.step`), maupun percakapan chat. Adaptor tidak memetakan event tersebut; penambahan baru wajib
+masuk `OfficeRealtimeEvent`, dikirim per tenant oleh server, dan hanya membawa data yang aman ditampilkan (tanpa
+penalaran model).
 
 ## 4. Perintah: visual vs bisnis
 
-Sumber: `app/game/commands.ts` (`AGENT_COMMANDS`). Panel perintah membaca definisi ini. Perintah yang tidak tersedia
-memakai `aria-disabled`, ikon gembok, dan tooltip alasan.
+Sumber: `app/game/commands.ts` (`AGENT_COMMANDS`). Perintah yang tidak tersedia memakai `aria-disabled`, ikon gembok,
+dan tooltip alasan.
 
-| Perintah              | Jenis  | Live                             | Alasan / perilaku live                                        |
-| --------------------- | ------ | -------------------------------- | ------------------------------------------------------------- |
-| Tugaskan              | bisnis | **nonaktif**                     | butuh modul tugas dan Agent Orchestrator (belum ada endpoint) |
-| Chat                  | bisnis | **nonaktif**                     | butuh AI Runtime Interface; tidak ada inferensi AI di Phase 1 |
-| Jeda / Lanjutkan      | bisnis | **nonaktif**                     | API mengubah status agent belum tersedia (Phase 1 read-only)  |
-| Pindah ke workstation | visual | aktif                            | hanya posisi tampilan; penugasan backend tidak berubah        |
-| Lihat aktivitas       | visual | aktif                            | status terakhir yang dikonfirmasi backend                     |
-| Profil                | visual | aktif                            | membuka `/agents/:id`                                         |
-| Instruksi teks        | bisnis | **nonaktif** (textarea disabled) | eksekusi tugas belum tersedia                                 |
-| Persetujuan           | bisnis | tidak tampil                     | modul persetujuan belum ada                                   |
+| Perintah              | Jenis  | Live                                           | Perilaku live                                                                   |
+| --------------------- | ------ | ---------------------------------------------- | ------------------------------------------------------------------------------- |
+| Tugaskan              | bisnis | **aktif bersyarat**                            | `POST /api/v1/tasks` bila runtime tersedia, `tasks.create`, agent aktif & bebas |
+| Instruksi teks        | bisnis | aktif bersyarat (textarea)                     | sama seperti Tugaskan; opsi "perlu persetujuan"                                 |
+| Batalkan tugas        | bisnis | aktif bila `tasks.cancel`                      | `POST /api/v1/tasks/:id/cancel`                                                 |
+| Setujui / Tolak       | bisnis | aktif bila `approvals.decide` & ada permintaan | `POST /api/v1/approvals/:id/decide`                                             |
+| Lihat hasil           | bisnis | aktif setelah hasil dirilis                    | `GET /api/v1/runs/:id/output`                                                   |
+| Chat                  | bisnis | **nonaktif**                                   | belum ada endpoint percakapan                                                   |
+| Jeda / Lanjutkan      | bisnis | **nonaktif**                                   | API mengubah status agent belum tersedia                                        |
+| Pindah ke workstation | visual | aktif                                          | hanya posisi tampilan                                                           |
+| Lihat aktivitas       | visual | aktif                                          | status terakhir yang dikonfirmasi backend                                       |
+| Profil                | visual | aktif                                          | membuka `/agents/:id`                                                           |
 
-Kode simulasi pratinjau tidak pernah menjadi jalur eksekusi live. Perintah bisnis di masa depan wajib melalui
-endpoint terautentikasi yang menegakkan: sesi cookie HttpOnly, keanggotaan tenant, RBAC (izin dari database), validasi
-lisensi, budget guard, persetujuan manusia untuk aksi eksternal, audit log, dan idempotensi bila relevan. Endpoint
-harus memakai `withTenantTransaction` (RLS) seperti modul lain.
+Kode simulasi pratinjau tidak pernah menjadi jalur eksekusi live. Setiap perintah bisnis melalui endpoint
+terautentikasi yang menegakkan sesi cookie HttpOnly, keanggotaan tenant, izin dari database (juga di RLS), batas
+tenant, idempotensi, dan persetujuan manusia untuk perilisan hasil (`docs/task-run-lifecycle.md`).
 
 ## 5. Transport realtime
 
@@ -90,13 +89,14 @@ harus memakai `withTenantTransaction` (RLS) seperti modul lain.
   Bun/Elysia mandiri (`api/standalone.ts`) dengan `OfficeRealtimeTransport` yang sama.
 - **Perbaikan stabilitas produksi.** Preset Nitro `bun` memakai `Bun.serve` dengan `idleTimeout` default 10 detik,
   sedangkan heartbeat default sebelumnya 15 detik. Akibatnya di build produksi stream diputus ±setiap 10 detik
-  (`ERR_INCOMPLETE_CHUNKED_ENCODING`): 3 koneksi dalam 32 detik, disusul sinkron ulang berulang. Perbaikannya:
+  (`ERR_INCOMPLETE_CHUNKED_ENCODING`). Perbaikannya:
   - `REALTIME_HEARTBEAT_MS` default menjadi **5000**;
-  - `loadApiConfig` menolak konfigurasi dengan heartbeat ≥ `NITRO_BUN_IDLE_TIMEOUT` × 1000 (default 10 detik), jadi
-    salah konfigurasi gagal saat startup, bukan diam-diam di produksi.
+  - `loadApiConfig` menolak konfigurasi dengan heartbeat ≥ `NITRO_BUN_IDLE_TIMEOUT` × 1000 (default 10 detik).
 
   Terukur ulang di build produksi dengan konfigurasi default: 1 koneksi selama 40 detik, 0 kegagalan.
-  `NITRO_BUN_IDLE_TIMEOUT` (detik, maks. 255) dapat dinaikkan bila heartbeat yang lebih jarang diinginkan.
+
+- **Validasi ulang otorisasi** setiap `REALTIME_REVALIDATE_MS` dan penutupan `closed` — lihat
+  `docs/secure-agent-realtime.md`.
 
 ## 6. Konsistensi tenant lintas tab
 
@@ -111,26 +111,27 @@ mengganti tenant tidak menampilkan atau menyimpan data tenant yang salah:
   otoritatif, membuang `tenant:*` bila pengguna/tenant berubah, lalu mengambil data ulang;
 - tab yang mengganti tenant/masuk mengirim `session-changed` lewat BroadcastChannel `aivo-auth-sync`
   (`app/plugins/auth-sync.client.ts`); tab lain `revalidate()`. Tab juga `revalidate()` saat kembali fokus/terlihat;
-- stream SSE: `ready` membawa tenant sesi (tabel §2) — tenant berbeda → `revalidate()`; stream juga ditolak 409
-  sebelum dibuka bila header tab usang;
+- stream SSE: `ready` membawa tenant sesi — tenant berbeda → `revalidate()`; server juga menutup stream dengan
+  `closed TENANT_CHANGED` bila tenant sesi berganti selama koneksi; stream ditolak 409 sebelum dibuka bila header tab
+  usang;
 - **logout** mengosongkan state/cache dan mengirim `logged-out` **hanya** bila server mengonfirmasi (200) atau
-  menyatakan sesi memang tidak valid (401). Kegagalan jaringan/server mengembalikan error (UserMenu/GameMenu
-  menawarkan coba lagi) tanpa berpura-pura sudah keluar; tab lain yang menerima `logged-out` diarahkan ke `/login`.
+  menyatakan sesi memang tidak valid (401). Kegagalan jaringan/server mengembalikan error tanpa berpura-pura sudah
+  keluar; tab lain yang menerima `logged-out` diarahkan ke `/login`.
 
 ## 7. Pengujian
 
-- `tests/unit/office-engine.test.ts`: `ready` → `resync` + `confirm`; `heartbeat` → `confirm`; `liveAgentSpecs`
-  memakai status otoritatif (aktif → siaga, lainnya → offline); perintah bisnis tidak didukung di live, perintah visual
-  didukung.
+- `tests/unit/live-adapter.test.ts`: pemetaan setiap event bisnis → aksi, `ready` dengan/tanpa replay, `closed`.
+- `tests/unit/office-engine.test.ts`: `liveAgentSpecs` memakai status otoritatif; perintah live yang didukung hanya
+  `assign_task` (+ visual), simulasi tidak menyentuh live.
 - `tests/unit/config.test.ts`: heartbeat default 5000; kombinasi heartbeat ≥ idle timeout ditolak.
-- `tests/nuxt/components.test.ts`: panel live menonaktifkan perintah bisnis dan instruksi ("Runtime belum
-  terhubung"); kontrol persetujuan tidak tampil di live; dunia live merender agent nyata dengan sprite sheet.
-- `tests/nuxt/tenant-switch.test.ts` (11 kasus): ganti tenant di satu tab (cache dibuang, konteks dimuat ulang, tab
-  lain diberi tahu; header `x-active-tenant` dikirim; switch ditolak tidak mengubah apa pun; ganti beruntun →
-  tenant terakhir), tenant berubah di tab lain (BroadcastChannel; request in-flight 409 tidak mengisi cache lama;
-  SSE `ready` tenant lain; logout di tab lain → `/login`), logout (gagal → tetap masuk + error; sukses → bersih).
-- `tests/integration/tenant-consistency.test.ts` (7 kasus): header cocok/kosong/usang/rusak, ganti beruntun, SSE
-  ditolak sebelum dibuka, header tidak memberi akses ke tenant yang bukan milik pengguna.
-- `tests/e2e/production.test.ts` (build produksi): SSE melalui mount Nitro (`ready` lalu `heartbeat`, dapat
-  dibatalkan), SSE ditolak tanpa sesi, SSR `/office` memuat data tenant aktif lalu berganti saat switch tenant.
-  Isolasi tenant lintas modul diuji di `tests/integration` dan `tests/security`.
+- `tests/nuxt/components.test.ts`: panel live tanpa data runtime menonaktifkan perintah bisnis; Phase 5 — `assign`
+  dengan opsi persetujuan, runtime `none` → alasan jujur, blok persetujuan hanya dengan `approvals.decide`, mode
+  pratinjau mengabaikan data live; kontrol simulasi tidak tampil di live.
+- `tests/nuxt/tenant-switch.test.ts` (11 kasus): ganti tenant satu/lintas tab, 409 tidak mengisi cache, SSE `ready`
+  tenant lain, logout.
+- `tests/integration/tenant-consistency.test.ts` (7 kasus): header cocok/kosong/usang/rusak, SSE ditolak sebelum
+  dibuka.
+- `tests/security/sse-security.test.ts` (10 kasus): 401 anonim, isolasi tenant, replay, `SESSION_INVALID`,
+  `ACCESS_REVOKED`, `TENANT_CHANGED`, `PERMISSION_REVOKED`, pembersihan langganan, heartbeat.
+- `tests/e2e/production.test.ts` (build produksi): SSE melalui mount Nitro, SSE ditolak tanpa sesi, SSR `/office`,
+  Phase 5 tanpa runtime → 409 `RUNTIME_NOT_CONFIGURED` dan `/tasks` SSR.

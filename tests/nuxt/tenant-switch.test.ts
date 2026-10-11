@@ -250,7 +250,14 @@ describe('tenant berubah di tab lain', () => {
               onStateChange('open')
               onEvent({
                 event: 'ready',
-                data: { tenantId: TENANT_B, connectionId: 'c1', serverTime: new Date(), heartbeatIntervalMs: 1000 },
+                data: {
+                  tenantId: TENANT_B,
+                  connectionId: 'c1',
+                  serverTime: new Date(),
+                  heartbeatIntervalMs: 1000,
+                  lastEventId: 0,
+                  replayed: false,
+                },
               })
               return () => {}
             },

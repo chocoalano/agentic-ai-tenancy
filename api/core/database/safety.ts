@@ -20,6 +20,12 @@ export const RLS_PROTECTED_TABLES = [
   'role_permissions',
   'membership_roles',
   'agents',
+  'agent_tasks',
+  'agent_runs',
+  'agent_run_events',
+  'agent_run_outputs',
+  'agent_approvals',
+  'realtime_outbox',
 ] as const
 
 /**

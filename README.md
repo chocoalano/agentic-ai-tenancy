@@ -5,8 +5,11 @@ Platform SaaS multi-tenant tempat perusahaan merekrut, mengonfigurasi, mengelola
 terintegrasi, autentikasi berbasis sesi, multi-tenancy dengan PostgreSQL Row Level Security, dan shell UI
 shadcn-vue bertema futuristik korporat.
 
-> Status: Phase 1 (fondasi). Orchestrator agent, inferensi AI, RAG, billing, dan marketplace **belum** dibangun —
-> lihat [docs/next-steps.md](docs/next-steps.md).
+> Status: Phase 5 (eksekusi agent live). Tugas nyata → worker PostgreSQL → runtime AI yang dapat diganti →
+> persetujuan manusia → event realtime ke game. Penyedia AI nyata (DigitalOcean, OpenAI-compatible) terimplementasi
+> tetapi **belum diverifikasi** tanpa kredensial; adapter `fixture` hanya untuk dev/test (bukan AI). RAG, billing,
+> marketplace **belum** dibangun — lihat [docs/phase5-live-agent-execution.md](docs/phase5-live-agent-execution.md)
+> dan [docs/next-steps.md](docs/next-steps.md).
 
 ## Teknologi
 
@@ -42,32 +45,34 @@ Garuda Logistik), `bima@garuda.test`, `citra@nusantara.test`.
 
 ## Perintah
 
-| Perintah                          | Fungsi                                                                    |
-| --------------------------------- | ------------------------------------------------------------------------- |
-| `bun run dev`                     | Dev server Nuxt + Elysia dengan runtime Bun (`bun --bun nuxt dev`)        |
-| `bun run build`                   | Build production (Nitro preset `bun`) ke `.output/`                       |
-| `bun run preview`                 | Menjalankan build production dengan `.env`                                |
-| `bun run start`                   | Menjalankan build production (env dari lingkungan)                        |
-| `bun run typecheck`               | `nuxt typecheck` (vue-tsc) + typecheck backend mandiri                    |
-| `bun run lint` / `lint:fix`       | ESLint (`@nuxt/eslint`)                                                   |
-| `bun run format` / `format:check` | Prettier                                                                  |
-| `bun run test`                    | Bun Test: unit + integrasi + keamanan (butuh PostgreSQL)                  |
-| `bun run test:unit`               | Unit test murni (tanpa database)                                          |
-| `bun run test:nuxt`               | Vitest + `@nuxt/test-utils` (komponen & composable)                       |
-| `bun run test:e2e`                | E2E terhadap `.output` (jalankan `bun run build` dulu; butuh PostgreSQL)  |
-| `bun run check:assets`            | Verifikasi aset game Virtual Office (manifest, registry, pemakaian)       |
-| `bun run assets:v2`               | Bangun ulang aset v2 + sprite sheet robot (butuh ImageMagick 7)           |
-| `bun run assets:audit`            | Audit kualitas aset game (`-- --v2` untuk hasil v2)                       |
-| `bun run assets:geometry`         | Kalibrasi ulang geometri pulau dari artwork (butuh ImageMagick 7)         |
-| `bun run db:bootstrap`            | Membuat role/database (idempoten)                                         |
-| `bun run db:migrate`              | Menerapkan migrasi SQL (`db/migrations`); `db:migrate:test` untuk DB test |
-| `bun run db:seed`                 | Seed pengembangan (ditolak bila `NODE_ENV=production`)                    |
-| `bun run db:reset`                | KHUSUS lokal: hapus database, bootstrap, migrasi ulang                    |
-| `bun run api:standalone`          | Menjalankan API yang sama sebagai server Elysia mandiri (port 4000)       |
+| Perintah                          | Fungsi                                                                                               |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `bun run dev`                     | Dev server Nuxt + Elysia dengan runtime Bun (`bun --bun nuxt dev`)                                   |
+| `bun run build`                   | Build production (Nitro preset `bun`) ke `.output/`                                                  |
+| `bun run preview`                 | Menjalankan build production dengan `.env`                                                           |
+| `bun run start`                   | Menjalankan build production (env dari lingkungan)                                                   |
+| `bun run typecheck`               | `nuxt typecheck` (vue-tsc) + typecheck backend mandiri                                               |
+| `bun run lint` / `lint:fix`       | ESLint (`@nuxt/eslint`)                                                                              |
+| `bun run format` / `format:check` | Prettier                                                                                             |
+| `bun run test`                    | Bun Test: unit + integrasi + keamanan (butuh PostgreSQL)                                             |
+| `bun run test:unit`               | Unit test murni (tanpa database)                                                                     |
+| `bun run test:nuxt`               | Vitest + `@nuxt/test-utils` (komponen & composable)                                                  |
+| `bun run test:e2e`                | E2E terhadap `.output` (jalankan `bun run build` dulu; butuh PostgreSQL)                             |
+| `bun run check:assets`            | Verifikasi aset game Virtual Office (manifest, registry, pemakaian)                                  |
+| `bun run assets:v2`               | Bangun ulang aset v2 + sprite sheet robot (butuh ImageMagick 7)                                      |
+| `bun run assets:audit`            | Audit kualitas aset game (`-- --v2` untuk hasil v2)                                                  |
+| `bun run assets:geometry`         | Kalibrasi ulang geometri pulau dari artwork (butuh ImageMagick 7)                                    |
+| `bun run db:bootstrap`            | Membuat role/database (idempoten)                                                                    |
+| `bun run db:migrate`              | Menerapkan migrasi SQL (`db/migrations`); `db:migrate:test` untuk DB test                            |
+| `bun run db:seed`                 | Seed pengembangan (ditolak bila `NODE_ENV=production`)                                               |
+| `bun run db:reset`                | KHUSUS lokal: hapus database, bootstrap, migrasi ulang                                               |
+| `bun run api:standalone`          | Menjalankan API yang sama sebagai server Elysia mandiri (port 4000)                                  |
+| `bun run worker`                  | Worker eksekusi agent mandiri (antrean PostgreSQL, lease, retry); alternatif `AI_WORKER_INLINE=true` |
+| `bun run test:worker`             | Test integrasi worker/persetujuan saja                                                               |
 
 ## URL penting (dev)
 
-- Aplikasi: `http://localhost:3000` — `/`, `/login`, `/register`, `/office`, `/agents`, `/settings`
+- Aplikasi: `http://localhost:3000` — `/`, `/login`, `/register`, `/office`, `/agents`, `/tasks`, `/settings`
 - Health: `http://localhost:3000/api/v1/health`
 - OpenAPI UI: `http://localhost:3000/api/openapi` · JSON: `http://localhost:3000/api/openapi/json` (hanya
   development/test; mati di production kecuali `OPENAPI_ENABLED=true`)
@@ -87,4 +92,8 @@ Garuda Logistik), `bima@garuda.test`, `citra@nusantara.test`.
   · [interaksi workstation](docs/workstation-interactions.md) · [perilaku ambient](docs/office-ambient-behavior.md)
   · [performa](docs/game-performance.md) · [QA visual](docs/frontend-visual-qa.md)
   · [produksi aset](docs/game-asset-production.md) · [laporan Phase 4](docs/phase4-living-office-report.md)
+- Eksekusi agent live (Phase 5): [laporan & status](docs/phase5-live-agent-execution.md)
+  · [siklus hidup tugas/run](docs/task-run-lifecycle.md) · [runtime & adapter AI](docs/agent-runtime-adapters.md)
+  · [operasi worker](docs/agent-worker-operations.md) · [realtime aman](docs/secure-agent-realtime.md)
+  · [persetujuan manusia](docs/agent-approval-workflow.md) · [integrasi event ke game](docs/game-live-event-integration.md)
 - [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) — instruksi untuk AI coding agent

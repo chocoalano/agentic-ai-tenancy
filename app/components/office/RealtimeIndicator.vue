@@ -26,9 +26,12 @@ const PRESENTATION: Record<RealtimeConnectionState, { label: string; tone: Statu
 }
 
 const current = computed(() => PRESENTATION[props.state])
-const lastBeat = computed(() =>
-  props.lastEvent ? new Date(props.lastEvent.data.serverTime).toLocaleTimeString('id-ID') : null,
-)
+const lastBeat = computed(() => {
+  const data = props.lastEvent?.data
+  if (!data) return null
+  const stamp = 'serverTime' in data ? data.serverTime : 'occurredAt' in data ? data.occurredAt : null
+  return stamp ? new Date(stamp).toLocaleTimeString('id-ID') : null
+})
 </script>
 
 <template>

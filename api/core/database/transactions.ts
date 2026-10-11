@@ -30,6 +30,48 @@ export class TenantTransaction {
   ) {
     if (token !== scopeToken) throw new Error('TenantTransaction hanya dapat dibuat oleh withTenantTransaction')
   }
+
+  get tenantId(): string {
+    return this.context.tenantId
+  }
+}
+
+/**
+ * Transaksi proses WORKER eksekusi untuk satu tenant: `app.tenant_id` di-set,
+ * `app.user_id` kosong, dan `app.actor = 'worker'` (transaction-local) sehingga
+ * kebijakan RLS yang mengizinkan penulisan run/event/output/persetujuan oleh
+ * worker berlaku. Tidak ada verifikasi keanggotaan (tidak ada pengguna); tenant
+ * berasal dari run yang diklaim lewat fungsi definer `app.claim_agent_run`.
+ */
+export class WorkerTransaction {
+  constructor(
+    token: typeof scopeToken,
+    readonly sql: TransactionSQL,
+    readonly tenantId: string,
+    readonly workerId: string,
+  ) {
+    if (token !== scopeToken) throw new Error('WorkerTransaction hanya dapat dibuat oleh withWorkerTransaction')
+  }
+}
+
+/** Scope minimum yang diterima repository tugas/run: transaksi tenant pengguna ATAU worker. */
+export type TenantScope = TenantTransaction | WorkerTransaction
+
+export function withWorkerTransaction<T>(
+  sql: SQL,
+  input: { tenantId: string; workerId: string },
+  fn: (scope: WorkerTransaction) => Promise<T>,
+): Promise<T> {
+  return sql.begin(async (tx) => {
+    await tx`
+      select
+        set_config('app.tenant_id', ${input.tenantId}, true),
+        set_config('app.user_id', '', true),
+        set_config('app.request_id', ${`worker:${input.workerId}`}, true),
+        set_config('app.actor', 'worker', true)
+    `
+    return fn(new WorkerTransaction(scopeToken, tx, input.tenantId, input.workerId))
+  })
 }
 
 /** Transaksi biasa tanpa konteks RLS (identitas global: users, sessions). */

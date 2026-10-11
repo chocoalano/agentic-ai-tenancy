@@ -14,7 +14,8 @@ import { OfficeEngine } from '~/game/engine'
 import { liveAgentSpecs } from '~/game/live-adapter'
 import { atlasAgentSpecs } from '~/game/simulation'
 import { buildWorld } from '~/game/world'
-import type { AgentSummary } from '~/utils/api-types'
+import type { LivePanelState } from '~/components/office/AgentCommandPanel.vue'
+import type { AgentSummary, ApprovalItem, TaskCapabilities, TaskItem } from '~/utils/api-types'
 import { buildOfficeScene } from '~/utils/office-layout'
 import { previewRoster, stationStatesFor } from '~/utils/office-preview'
 
@@ -27,6 +28,8 @@ const agent: AgentSummary = {
   description: 'Menjawab pertanyaan pelanggan.',
   lifecycleStatus: 'active',
   runtimeStatus: null,
+  currentTaskId: null,
+  currentRunId: null,
   isSeedData: true,
   createdAt: new Date('2026-01-01T00:00:00Z'),
   updatedAt: new Date('2026-01-01T00:00:00Z'),
@@ -290,5 +293,156 @@ describe('Virtual Office memakai aset game asli', () => {
     await wrapper.find('[data-instruction-input]').setValue('Sage, lakukan riset pasar.')
     await wrapper.find('form').trigger('submit')
     expect(wrapper.findComponent(AgentCommandPanel).emitted('instruct')?.[0]).toEqual(['Sage, lakukan riset pasar.'])
+  })
+
+  // ---- Phase 5: panel live memakai data backend (tugas, kemampuan runtime, persetujuan) ----
+  const AT = new Date('2026-10-11T10:00:00Z')
+  const capabilities = (runtime: TaskCapabilities['runtime'], canCreate = true): TaskCapabilities => ({
+    runtime,
+    canCreate,
+    canCancel: true,
+    limits: { maxInstructionChars: 4000, maxActiveTasks: 3, dailyTaskLimit: 50, maxAttempts: 3 },
+    usage: { activeTasks: 0, createdToday: 0 },
+  })
+  const fixtureRuntime: TaskCapabilities['runtime'] = {
+    available: true,
+    kind: 'fixture',
+    provider: 'fixture',
+    model: 'fixture-deterministic-v1',
+  }
+  const waitingTask: TaskItem = {
+    id: '1b2c3d4e-5f60-4718-8293-a4b5c6d7e8f9',
+    agentId: agent.id,
+    agentName: agent.name,
+    createdByUserId: '0f1e2d3c-4b5a-4968-8776-655443322110',
+    title: 'Susun draf email penawaran',
+    instruction: 'Susun draf email penawaran untuk prospek enterprise.',
+    priority: 'normal',
+    status: 'waiting_approval',
+    requiresApproval: true,
+    latestRun: {
+      id: '2c3d4e5f-6071-4829-93a4-b5c6d7e8f901',
+      taskId: '1b2c3d4e-5f60-4718-8293-a4b5c6d7e8f9',
+      agentId: agent.id,
+      attempt: 1,
+      status: 'waiting_approval',
+      runtimeProvider: 'fixture',
+      runtimeModel: 'fixture-deterministic-v1',
+      claimedAt: AT,
+      startedAt: AT,
+      completedAt: null,
+      cancelRequested: false,
+      errorCode: null,
+      errorMessage: null,
+      retryable: null,
+      providerRequestId: null,
+      usage: null,
+      createdAt: AT,
+      updatedAt: AT,
+    },
+    attempts: 1,
+    maxAttempts: 3,
+    errorCode: null,
+    errorMessage: null,
+    createdAt: AT,
+    updatedAt: AT,
+    queuedAt: AT,
+    startedAt: AT,
+    completedAt: null,
+  }
+  const pendingApproval: ApprovalItem = {
+    id: '3d4e5f60-7182-493a-a4b5-c6d7e8f90a1b',
+    taskId: waitingTask.id,
+    runId: waitingTask.latestRun?.id ?? '',
+    agentId: agent.id,
+    actionType: 'release_result',
+    actionSummary: 'Rilis hasil tugas "Susun draf email penawaran" kepada pengguna.',
+    status: 'pending',
+    requestedBy: 'worker',
+    requestedAt: AT,
+    expiresAt: new Date('2026-10-12T10:00:00Z'),
+    decidedByUserId: null,
+    decidedAt: null,
+    decisionNote: null,
+  }
+  const liveState = (overrides: Partial<LivePanelState>): LivePanelState => ({
+    capabilities: capabilities(fixtureRuntime),
+    tasks: [],
+    currentTask: null,
+    pendingApproval: null,
+    result: null,
+    resultError: null,
+    submitting: false,
+    error: null,
+    loading: false,
+    canDecide: true,
+    canCancel: true,
+    ...overrides,
+  })
+  const mountLive = (live: LivePanelState, preview = false) =>
+    mountSuspended(
+      defineComponent({
+        render: () =>
+          h(TooltipProvider, null, () =>
+            h(AgentCommandPanel, {
+              agent: views(false)[0] as OfficeAgentView,
+              preview,
+              liveAgent: agent,
+              roleTitle: agent.roleTitle,
+              feedback: null,
+              live,
+            }),
+          ),
+      }),
+    )
+
+  it('panel live: tugas nyata dikirim sebagai `assign` (bukan simulasi) dengan opsi persetujuan; runtime fixture diberi label jujur', async () => {
+    const wrapper = await mountLive(liveState({}))
+    expect(wrapper.find('[data-runtime-fixture-tag]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('Fixture (bukan AI)')
+    expect(wrapper.text()).not.toContain('SIMULASI')
+    expect(wrapper.find('[data-instruction-input]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.find('[data-command-key="assign_task"]').attributes('aria-disabled')).toBe('false')
+    await wrapper.find('[data-live-requires-approval]').trigger('click')
+    await wrapper.find('[data-instruction-input]').setValue('Analisis pasar AI SaaS Indonesia.')
+    await wrapper.find('form').trigger('submit')
+    const panel = wrapper.findComponent(AgentCommandPanel)
+    expect(panel.emitted('assign')?.[0]).toEqual(['Analisis pasar AI SaaS Indonesia.', { requiresApproval: true }])
+    expect(panel.emitted('instruct')).toBeUndefined()
+  })
+
+  it('panel live: runtime belum dikonfigurasi → tugaskan nonaktif dengan alasan jujur (tanpa eksekusi palsu)', async () => {
+    const none: TaskCapabilities['runtime'] = { available: false, kind: 'none', provider: 'none', model: '' }
+    const wrapper = await mountLive(liveState({ capabilities: capabilities(none) }))
+    expect(wrapper.find('[data-instruction-input]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-command-key="assign_task"]').attributes('aria-disabled')).toBe('true')
+    expect(wrapper.text()).toContain('Runtime AI belum dikonfigurasi')
+    expect(wrapper.find('[data-runtime-fixture-tag]').exists()).toBe(false)
+  })
+
+  it('panel live: persetujuan backend hanya bisa diputus dengan approvals.decide; hasil belum bisa dilihat; pratinjau tidak menampilkannya', async () => {
+    const base = { tasks: [waitingTask], currentTask: waitingTask, pendingApproval }
+    const noPermission = await mountLive(liveState({ ...base, canDecide: false }))
+    expect(noPermission.find('[data-live-task-status]').attributes('data-live-task-status')).toBe('waiting_approval')
+    expect(noPermission.find('[data-live-approval]').exists()).toBe(true)
+    expect(noPermission.find('[data-live-approve]').exists()).toBe(false)
+    expect(noPermission.text()).toContain('approvals.decide')
+    expect(noPermission.find('[data-live-view-result]').exists()).toBe(false)
+    expect(noPermission.find('[data-approval-request]').exists()).toBe(false)
+
+    const decider = await mountLive(liveState({ ...base, canDecide: true }))
+    await decider.find('[data-live-approve]').trigger('click')
+    await decider.find('[data-live-reject]').trigger('click')
+    expect(decider.findComponent(AgentCommandPanel).emitted('decide')).toEqual([
+      [pendingApproval.id, 'approve'],
+      [pendingApproval.id, 'reject'],
+    ])
+
+    // Pemisahan ketat: mode pratinjau mengabaikan data live sepenuhnya.
+    const preview = await mountLive(liveState(base), true)
+    expect(preview.find('[data-live-task]').exists()).toBe(false)
+    expect(preview.find('[data-live-approval]').exists()).toBe(false)
+    expect(preview.find('[data-live-requires-approval]').exists()).toBe(false)
+    expect(preview.text()).toContain('SIMULASI')
   })
 })

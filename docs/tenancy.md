@@ -88,6 +88,12 @@ Semua tabel tenant memakai `ENABLE` **dan** `FORCE ROW LEVEL SECURITY` (pemilik 
 | `membership_roles`   | tenant aktif **atau** keanggotaan milik pengguna               | tenant aktif **dan** `members.manage` (+ trigger: peran harus sistem/tenant sama); bootstrap: pembuat tenant → peran sistem `owner` untuk keanggotaannya sendiri |
 | `roles`              | sistem, tenant aktif, atau tenant tempat pengguna anggota      | hanya peran kustom tenant aktif **dan** `members.manage`                                                                                                         |
 | `role_permissions`   | mengikuti visibilitas `roles`                                  | hanya peran kustom tenant aktif **dan** `members.manage`                                                                                                         |
+| `agent_tasks`        | tenant aktif (atau pemilik skema untuk fungsi definer)         | insert: tenant aktif **dan** `tasks.create` **dan** `created_by_user_id = current_user` (atau worker); update: worker atau `tasks.cancel`                        |
+| `agent_runs`         | tenant aktif                                                   | insert/update hanya worker (`app.is_worker()`), kecuali `cancel_requested` lewat `tasks.cancel`; tanpa DELETE                                                    |
+| `agent_run_events`   | tenant aktif                                                   | insert hanya worker; append-only (tanpa UPDATE/DELETE)                                                                                                           |
+| `agent_run_outputs`  | tenant aktif                                                   | insert worker; update (`released`) worker atau `approvals.decide`                                                                                                |
+| `agent_approvals`    | tenant aktif                                                   | insert worker; update worker atau `approvals.decide`                                                                                                             |
+| `realtime_outbox`    | tenant aktif (hub membaca lintas tenant lewat fungsi definer)  | insert tenant aktif/worker; dipangkas hanya lewat `app.prune_realtime_outbox`                                                                                    |
 
 > **Perhatian:** kebijakan `tenant_memberships`, `membership_roles`, dan `roles` sengaja memakai `OR` agar
 > pengguna dapat melihat keanggotaannya sendiri lintas tenant (tenant switcher, resolusi izin). Akibatnya, query
@@ -110,6 +116,18 @@ untuk dirinya sendiri dan menautkan **hanya** peran sistem `owner` ke keanggotaa
 perusahaan). Kebijakan tidak boleh men-subselect relasinya sendiri (PostgreSQL menolak dengan "infinite recursion
 detected in policy"); pembacaan lewat fungsi aman. Diuji di `tests/security/tenant-hardening.test.ts` dan
 `tests/security/rls.test.ts`.
+
+### Pengerasan 0008: tugas, run, persetujuan, outbox (Phase 5)
+
+Migrasi `0008_agent_tasks.sql` menambahkan izin `tasks.read/create/cancel`, `approvals.read/decide` (owner/admin
+semua; member tanpa `approvals.decide`; viewer hanya `*.read`) dan dua helper: `app.is_worker()` (benar hanya bila
+`app.actor = 'worker'` di transaksi saat ini — disetel **hanya** oleh `withWorkerTransaction`) dan
+`app.is_privileged_caller()` (pemilik skema, bukan anggota `agentic_runtime`) agar fungsi SECURITY DEFINER sempit
+(`app.claim_agent_run`, `app.expired_run_leases`, `app.expired_pending_approvals`, `app.realtime_outbox_after`,
+`app.realtime_outbox_latest_id`, `app.prune_realtime_outbox`) dapat melihat antrean lintas tenant walau `FORCE RLS`
+berlaku pada pemilik. Semua tabel anak memakai kunci asing komposit `(id, tenant_id)` ke agent/tugas/run sehingga
+baris tidak dapat menunjuk induk tenant lain. Role runtime tidak memiliki `DELETE` pada tabel bisnis baru. Detail:
+`docs/task-run-lifecycle.md`, `docs/agent-worker-operations.md`.
 
 ### Role database
 
@@ -137,13 +155,15 @@ Catatan: tenant aktif melekat pada sesi, sehingga berlaku untuk semua tab pada s
 
 ## Test isolasi
 
-| File                                      | Cakupan                                                                                                                                                                                                                               |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `tests/security/tenant-isolation.test.ts` | User A hanya melihat tenant A; Tenant B → 404; agent B tidak terbaca; `active_tenant_id` palsu di sesi ditolak; switch menukar data; izin per tenant; anggota tanpa izin → 403; keanggotaan ditangguhkan; agregat tidak bocor         |
-| `tests/security/rls.test.ts`              | Role runtime aman; query tanpa filter `tenant_id` tetap terisolasi; INSERT/UPDATE/DELETE lintas tenant ditolak; FORCE RLS pada pemilik; peran tenant lain tidak dapat ditautkan; konteks tidak valid fail-closed; katalog izin = kode |
-| `tests/security/pool-isolation.test.ts`   | 60 transaksi paralel dua tenant (pool 3); koneksi bersih setelah commit/rollback; 40 request HTTP paralel                                                                                                                             |
-| `tests/security/csrf.test.ts`             | Login/logout/switch lintas situs ditolak; same-origin & GET diizinkan                                                                                                                                                                 |
-| `tests/nuxt/tenant-switch.test.ts`        | Cache `tenant:*` dibuang; `useTenantAsyncData` mengambil ulang untuk tenant baru; switch gagal tidak mengubah state                                                                                                                   |
-| `tests/e2e/production.test.ts`            | SSR production menampilkan data tenant aktif saja, sebelum & sesudah switch                                                                                                                                                           |
+| File                                      | Cakupan                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tests/security/tenant-isolation.test.ts` | User A hanya melihat tenant A; Tenant B → 404; agent B tidak terbaca; `active_tenant_id` palsu di sesi ditolak; switch menukar data; izin per tenant; anggota tanpa izin → 403; keanggotaan ditangguhkan; agregat tidak bocor                                                                                 |
+| `tests/security/rls.test.ts`              | Role runtime aman; query tanpa filter `tenant_id` tetap terisolasi; INSERT/UPDATE/DELETE lintas tenant ditolak; FORCE RLS pada pemilik; peran tenant lain tidak dapat ditautkan; konteks tidak valid fail-closed; katalog izin = kode                                                                         |
+| `tests/security/pool-isolation.test.ts`   | 60 transaksi paralel dua tenant (pool 3); koneksi bersih setelah commit/rollback; 40 request HTTP paralel                                                                                                                                                                                                     |
+| `tests/security/csrf.test.ts`             | Login/logout/switch lintas situs ditolak; same-origin & GET diizinkan                                                                                                                                                                                                                                         |
+| `tests/security/task-isolation.test.ts`   | Tugas/run/outbox tenant A = 0 baris untuk tenant B dan tidak dapat diubah; FK komposit menolak run/tugas lintas tenant; viewer tanpa `tasks.create` ditolak database; pengguna biasa/worker tenant lain tidak dapat menulis output; fungsi definer vs select langsung; role runtime tidak dapat mematikan RLS |
+| `tests/security/sse-security.test.ts`     | SSE: 401 anonim; isolasi event antar tenant; replay `Last-Event-ID`; `closed` `SESSION_INVALID`/`ACCESS_REVOKED`/`TENANT_CHANGED`/`PERMISSION_REVOKED`; pembersihan langganan; heartbeat                                                                                                                      |
+| `tests/nuxt/tenant-switch.test.ts`        | Cache `tenant:*` dibuang; `useTenantAsyncData` mengambil ulang untuk tenant baru; switch gagal tidak mengubah state                                                                                                                                                                                           |
+| `tests/e2e/production.test.ts`            | SSR production menampilkan data tenant aktif saja, sebelum & sesudah switch                                                                                                                                                                                                                                   |
 
 Semua test di atas (kecuali `tests/nuxt`) membutuhkan PostgreSQL.

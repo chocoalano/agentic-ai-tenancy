@@ -275,6 +275,34 @@ describe('server production (Bun + Nitro preset bun)', () => {
     const response = await fetch(`${base}/api/v1/realtime/stream`)
     expect(response.status).toBe(401)
   })
+
+  test('Phase 5: tanpa runtime, tugas nyata ditolak jujur (409 RUNTIME_NOT_CONFIGURED) dan /tasks SSR menampilkannya', async () => {
+    const cookie = await login(memberEmail)
+    await fetch(`${base}/api/v1/tenants/${tenantA}/switch`, { method: 'POST', headers: { cookie, origin: base } })
+    const agents = (await (await fetch(`${base}/api/v1/agents`, { headers: { cookie } })).json()) as {
+      items: { id: string; runtimeStatus: unknown; currentTaskId: unknown }[]
+    }
+    expect(agents.items.length).toBeGreaterThan(0)
+    expect(agents.items[0]?.runtimeStatus).toBeNull()
+    const capabilities = (await (await fetch(`${base}/api/v1/tasks/capabilities`, { headers: { cookie } })).json()) as {
+      runtime: { available: boolean; kind: string }
+      canCreate: boolean
+    }
+    expect(capabilities.runtime).toMatchObject({ available: false, kind: 'none' })
+    expect(capabilities.canCreate).toBe(false)
+    const created = await fetch(`${base}/api/v1/tasks`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ agentId: agents.items[0]?.id, instruction: 'Riset pasar' }),
+    })
+    expect(created.status).toBe(409)
+    expect(await created.json()).toMatchObject({ code: 'RUNTIME_NOT_CONFIGURED' })
+    const list = (await (await fetch(`${base}/api/v1/tasks`, { headers: { cookie } })).json()) as { items: unknown[] }
+    expect(list.items).toEqual([])
+    const page = await fetch(`${base}/tasks`, { headers: { cookie } })
+    expect(page.status).toBe(200)
+    expect(await page.text()).toContain('Runtime AI belum dikonfigurasi')
+  })
 })
 
 describe('server production dengan database tidak terjangkau (gerbang kesiapan mode mount)', () => {

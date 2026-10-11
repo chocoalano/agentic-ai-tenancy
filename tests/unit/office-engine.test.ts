@@ -521,9 +521,10 @@ describe('perintah & adaptor live', () => {
     expect(rejected.animations.has('error')).toBe(true)
   })
 
-  test('perintah bisnis tidak didukung di mode live (tidak ada endpoint), perintah visual didukung', () => {
+  test('mode live: perintah visual didukung; perintah bisnis hanya yang punya endpoint nyata (tugaskan)', () => {
+    const LIVE_BUSINESS = new Set(['assign_task'])
     for (const command of AGENT_COMMANDS) {
-      expect(command.live.supported).toBe(command.kind === 'visual')
+      expect(command.live.supported).toBe(command.kind === 'visual' || LIVE_BUSINESS.has(command.key))
     }
   })
 
@@ -535,7 +536,14 @@ describe('perintah & adaptor live', () => {
     expect(
       mapRealtimeEvent({
         event: 'ready',
-        data: { tenantId: 't', connectionId: 'c', serverTime: now, heartbeatIntervalMs: 1000 },
+        data: {
+          tenantId: 't',
+          connectionId: 'c',
+          serverTime: now,
+          heartbeatIntervalMs: 1000,
+          lastEventId: 0,
+          replayed: false,
+        },
       })[0],
     ).toEqual({ type: 'resync', reason: 'ready' })
     expect(liveActivity('active', null)).toBe('idle')

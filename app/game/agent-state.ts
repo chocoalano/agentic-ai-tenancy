@@ -80,12 +80,25 @@ export const ACTIVITY_PRESENTATION: Record<ActivityState, ActivityPresentation> 
   failed: { animation: 'error', label: 'Gagal', effect: 'alert', workstationActive: false },
 }
 
+/** Status runtime otoritatif dari API agent (run aktif terbaru); null = tidak sedang mengerjakan tugas. */
+export type LiveRuntimeStatus = 'thinking' | 'working' | 'waiting_approval' | null
+
 /**
- * Mode live: status otoritatif → state visual. Phase 1 belum punya status
- * runtime (selalu null), sehingga hanya siklus hidup yang menentukan:
- * aktif → siaga; dijeda/draf/arsip → offline. Tidak ada aktivitas karangan.
+ * Mode live: status otoritatif → state visual. Siklus hidup non-aktif →
+ * offline; selain itu status runtime dari run aktif terbaru (queued/claimed →
+ * thinking, running → working, waiting_approval) atau siaga. Tidak ada
+ * aktivitas karangan: tanpa run aktif, robot siaga.
  */
-export function liveActivity(lifecycle: AgentLifecycleStatus, runtimeStatus: null): ActivityState {
-  void runtimeStatus
-  return lifecycle === 'active' ? 'idle' : 'offline'
+export function liveActivity(lifecycle: AgentLifecycleStatus, runtimeStatus: LiveRuntimeStatus): ActivityState {
+  if (lifecycle !== 'active') return 'offline'
+  switch (runtimeStatus) {
+    case 'thinking':
+      return 'thinking'
+    case 'working':
+      return 'working'
+    case 'waiting_approval':
+      return 'waiting_approval'
+    default:
+      return 'idle'
+  }
 }

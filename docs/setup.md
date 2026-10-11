@@ -63,9 +63,19 @@ Alternatif: `openssl rand -base64 48`.
 | `API_STANDALONE_PORT`                                                                    | tidak | Port `bun run api:standalone` (default 4000)                                                            |
 | `SEED_DEFAULT_PASSWORD`                                                                  | lokal | Password akun seed (`bun run db:seed`)                                                                  |
 | `REALTIME_HEARTBEAT_MS`                                                                  | tidak | Interval heartbeat SSE (default 5000; harus < idle timeout)                                             |
+| `REALTIME_REVALIDATE_MS`, `REALTIME_OUTBOX_POLL_MS`, `REALTIME_OUTBOX_RETENTION_HOURS`   | tidak | Validasi ulang otorisasi SSE (15000), polling outbox (1000), retensi outbox (24 jam)                    |
+| `AI_RUNTIME_PROVIDER`                                                                    | tidak | `none` (default) · `fixture` (dev/test, ditolak production) · `openai-compatible`                       |
+| `AI_RUNTIME_BASE_URL`, `AI_RUNTIME_API_KEY`, `AI_RUNTIME_MODEL`                          | ya**  | Penyedia OpenAI-compatible (DigitalOcean: `https://inference.do-ai.run/v1`); kunci tidak pernah di-log  |
+| `AI_RUNTIME_TIMEOUT_SECONDS`, `AI_RUNTIME_TEMPERATURE`                                   | tidak | Batas waktu panggilan model (120), temperature (0.2)                                                    |
+| `AI_MAX_INSTRUCTION_CHARS`, `AI_MAX_OUTPUT_CHARS`, `AI_MAX_OUTPUT_TOKENS`                | tidak | Batas instruksi (4000), keluaran (20000 karakter / 1024 token)                                          |
+| `AI_WORKER_INLINE`, `AI_WORKER_ID`, `AI_WORKER_CONCURRENCY`, `AI_WORKER_POLL_MS`         | tidak | Worker inline (false), identitas, konkurensi (2), jeda polling (1000)                                   |
+| `AI_RUN_LEASE_SECONDS`, `AI_RUN_MAX_ATTEMPTS`                                            | tidak | Lease run (60), percobaan maksimum (3)                                                                  |
+| `AI_TENANT_MAX_ACTIVE_RUNS`, `AI_TENANT_DAILY_RUN_LIMIT`                                 | tidak | Batas tugas aktif (3) dan harian (100) per tenant                                                       |
+| `RATE_LIMIT_TASK_CREATE_MAX`, `..._WINDOW_MINUTES`                                       | tidak | Pembuatan tugas per pengguna (default 30 / 15)                                                          |
+| `APPROVAL_TTL_HOURS`, `APPROVAL_FORBID_SELF`                                             | tidak | Kedaluwarsa persetujuan (24), larang swa-persetujuan (false)                                            |
 | `NITRO_BUN_IDLE_TIMEOUT`                                                                 | tidak | Idle timeout `Bun.serve` produksi, detik (default Bun 10)                                               |
 
-\* wajib untuk menjalankan migrasi.
+\* wajib untuk menjalankan migrasi. \*\* wajib hanya bila `AI_RUNTIME_PROVIDER=openai-compatible`.
 
 Konfigurasi server divalidasi saat startup (`api/core/config/env.ts`). Nilai tidak valid membuat server gagal
 start dengan pesan yang jelas — tidak ada fallback diam-diam.
@@ -163,6 +173,19 @@ NODE_ENV=production PORT=3000 DATABASE_URL=... SESSION_SECRET=... bun .output/se
 
 Deploy cukup menyalin `.output/` (dependensi server sudah di-trace ke `.output/server/node_modules`). Production
 memerlukan HTTPS: cookie sesi memakai prefix `__Host-` dan atribut `Secure`.
+
+### Worker eksekusi agent (Phase 5)
+
+Tugas nyata dieksekusi worker, bukan request HTTP. Jalankan sebagai proses terpisah (dianjurkan di production):
+
+```bash
+bun run worker                      # memuat .env yang sama; keluar kode 1 bila role database tidak aman
+# atau satu proses (dev/demo): AI_WORKER_INLINE=true bun run dev
+```
+
+Tanpa worker, tugas tetap `queued`. Tanpa `AI_RUNTIME_PROVIDER`, `POST /api/v1/tasks` menjawab 409
+`RUNTIME_NOT_CONFIGURED` dan panel perintah menampilkan alasannya. Panduan operasi: `docs/agent-worker-operations.md`;
+konfigurasi penyedia: `docs/agent-runtime-adapters.md`.
 
 ## 6. Test
 

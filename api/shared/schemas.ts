@@ -15,6 +15,20 @@ export const PermissionKeySchema = t.UnionEnum(PERMISSION_KEYS, { description: '
 
 export const IdParams = t.Object({ id: Uuid })
 
+/**
+ * Enum OPSIONAL untuk body/query. `t.Optional(t.UnionEnum(...))` TIDAK boleh dipakai:
+ * UnionEnum Elysia menyetel `default = nilai pertama`, sehingga field yang tidak dikirim
+ * diisi diam-diam (mis. filter status=created, prioritas=low).
+ */
+export function optionalEnum<const T extends readonly string[]>(values: T, description?: string) {
+  return t.Optional(
+    t.Union(
+      values.map((value) => t.Literal(value)),
+      { description },
+    ),
+  )
+}
+
 export const UserSchema = t.Object(
   {
     id: Uuid,

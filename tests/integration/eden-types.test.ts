@@ -19,13 +19,25 @@ describe('inferensi tipe Eden', () => {
     expectTypeOf<Agents['items'][number]['lifecycleStatus']>().toEqualTypeOf<
       'draft' | 'active' | 'paused' | 'archived'
     >()
-    expectTypeOf<Agents['items'][number]['runtimeStatus']>().toEqualTypeOf<null>()
+    expectTypeOf<Agents['items'][number]['runtimeStatus']>().toEqualTypeOf<
+      'thinking' | 'working' | 'waiting_approval' | null
+    >()
     expectTypeOf<Agents['items'][number]['createdAt']>().toEqualTypeOf<Date>()
 
     type Me = DataOf<Client['v1']['auth']['me']['get']>
     expectTypeOf<Me['user']['email']>().toEqualTypeOf<string>()
     expectTypeOf<NonNullable<Me['activeTenant']>['permissions'][number]>().toEqualTypeOf<
-      'tenant.read' | 'tenant.manage' | 'members.read' | 'members.manage' | 'agents.read' | 'agents.manage'
+      | 'tenant.read'
+      | 'tenant.manage'
+      | 'members.read'
+      | 'members.manage'
+      | 'agents.read'
+      | 'agents.manage'
+      | 'tasks.read'
+      | 'tasks.create'
+      | 'tasks.cancel'
+      | 'approvals.read'
+      | 'approvals.decide'
     >()
   })
 

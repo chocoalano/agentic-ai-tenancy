@@ -108,10 +108,18 @@ describe('ganti tenant (User C anggota dua tenant)', () => {
   test('peran dan izin di-resolve ulang per tenant dari database', async () => {
     await userC.api.v1.tenants({ id: userA.tenantId }).switch.post()
     const meA = await userC.api.v1.auth.me.get()
-    expect(meA.data?.activeTenant?.permissions).toEqual(['agents.read', 'tenant.read'])
+    expect(meA.data?.activeTenant?.permissions).toEqual(['agents.read', 'approvals.read', 'tasks.read', 'tenant.read'])
     await userC.api.v1.tenants({ id: userB.tenantId }).switch.post()
     const meB = await userC.api.v1.auth.me.get()
-    expect(meB.data?.activeTenant?.permissions).toEqual(['agents.read', 'members.read', 'tenant.read'])
+    expect(meB.data?.activeTenant?.permissions).toEqual([
+      'agents.read',
+      'approvals.read',
+      'members.read',
+      'tasks.cancel',
+      'tasks.create',
+      'tasks.read',
+      'tenant.read',
+    ])
   })
 })
 

@@ -14,6 +14,11 @@ export const PERMISSION_KEYS = [
   'members.manage',
   'agents.read',
   'agents.manage',
+  'tasks.read',
+  'tasks.create',
+  'tasks.cancel',
+  'approvals.read',
+  'approvals.decide',
 ] as const
 
 export type PermissionKey = (typeof PERMISSION_KEYS)[number]

@@ -48,10 +48,10 @@ export const NAVIGATION: NavigationGroup[] = [
       {
         key: 'tasks',
         label: 'Tugas',
-        description: 'Penugasan, run, dan persetujuan',
+        description: 'Riwayat tugas, run, hasil, dan persetujuan AI employee',
         icon: ListChecks,
-        status: 'soon',
-        release: 'Wave 2',
+        to: '/tasks',
+        status: 'available',
       },
       {
         key: 'missions',

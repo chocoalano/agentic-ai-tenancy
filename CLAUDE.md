@@ -26,6 +26,8 @@ bun run check:assets        # verifikasi aset game Virtual Office
 bun run assets:v2           # bangun ulang aset v2 + sprite sheet robot (butuh ImageMagick 7)
 bun run assets:audit        # audit kualitas aset (alpha, halo, serpihan, terpotong); -- --v2 untuk hasil v2
 bun run assets:geometry     # kalibrasi ulang geometri pulau dari artwork → app/game/island-geometry.ts (ImageMagick 7)
+bun run worker              # worker eksekusi agent mandiri (antrean PostgreSQL, lease, retry); alternatif AI_WORKER_INLINE=true
+bun run test:worker         # test integrasi worker + persetujuan saja
 ```
 
 Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `check:assets`, `test`, `test:nuxt`,
@@ -43,8 +45,15 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
   `SERVICE_MISCONFIGURED` sampai DB terjangkau dan role RLS terverifikasi; pulih sendiri; kegagalan pemeriksaan tidak
   pernah dianggap lulus. Standalone exit 1 bila role tidak aman.
 - `domains/` berisi tipe/aturan murni tanpa dependensi runtime; boleh dipakai frontend dan backend.
-- Identitas agent milik platform (`agents`), bukan ID agent di penyedia AI. Akses AI kelak lewat AI Runtime
-  Interface + adapter.
+- Identitas agent milik platform (`agents`), bukan ID agent di penyedia AI. Akses AI hanya lewat `AgentRuntime`
+  (`api/core/runtime/`: `none` default, `fixture` dev/test, `openai-compatible` → DigitalOcean Serverless Inference
+  via `fetch`, tanpa SDK). Model tidak diberi tool, shell, jaringan, atau akses database; keluarannya hanya teks.
+- Eksekusi tugas (Phase 5): `POST /tasks` hanya mencatat tugas + run antre (transaksi tenant + outbox); worker
+  (`api/modules/runs/worker.ts`, `bun run worker` atau `AI_WORKER_INLINE=true`) mengklaim lewat
+  `app.claim_agent_run` (FOR UPDATE SKIP LOCKED + lease), memanggil runtime **di luar transaksi**, dan menulis
+  hasil/transisi dengan CAS (`TASK_TRANSITIONS`/`RUN_TRANSITIONS` di `domains/tasks/types.ts`). Percobaan ulang =
+  run baru (`attempt+1`). Persetujuan manusia menggerbangi perilisan hasil (`agent_approvals`, `approvals.decide`).
+  Lihat `docs/task-run-lifecycle.md`, `docs/agent-worker-operations.md`, `docs/agent-approval-workflow.md`.
 
 ## Aturan keamanan (wajib)
 
@@ -75,6 +84,15 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
 - Izin tidak di-hardcode per pengguna; pemetaan peran → izin ada di database. `PERMISSION_KEYS` hanya kontrak tipe.
 - Seed hanya lokal (`NODE_ENV=production` ditolak). Jangan membuat akun/tenant hardcoded untuk production.
 - Error ke klien hanya `ApiError {code, message, requestId?, details?}`; jangan membocorkan pesan PostgreSQL.
+- Worker: hanya `withWorkerTransaction` (`app.actor='worker'`, transaction-local) boleh memenuhi `app.is_worker()`;
+  jangan memakainya di route/service HTTP. Fungsi SECURITY DEFINER lintas tenant hanya untuk klaim antrean, lease/
+  persetujuan kedaluwarsa, dan outbox — jangan menambah yang mengembalikan data bisnis.
+- Runtime AI: `AI_RUNTIME_API_KEY` tidak pernah di-log, masuk event/outbox, atau dikirim ke klien. `fixture` ditolak di
+  production. Jangan mengarang usage/biaya/progres: kolom usage hanya dari respons penyedia (`null` bila tidak ada).
+  Event realtime (`enqueueRealtimeEvent`) tidak memuat prompt, keluaran model, atau pesan error mentah.
+- Tabel bisnis Phase 5 (`agent_tasks`, `agent_runs`, `agent_run_events`, `agent_run_outputs`, `agent_approvals`,
+  `realtime_outbox`): penulisan ditegakkan RLS lewat `app.has_permission('tasks.create'|'tasks.cancel'|'approvals.decide')`
+  atau `app.is_worker()`; FK komposit `(id, tenant_id)`; role runtime tanpa DELETE.
 
 ## Konvensi kode
 
@@ -123,8 +141,13 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
   `docs/workstation-interactions.md`, `docs/office-ambient-behavior.md`, `docs/game-performance.md`.
 - Mode pratinjau (`app/game/simulation.ts`, `app/utils/office-preview.ts`) hanya simulasi frontend berlabel
   SIMULASI/DEMO: tidak pernah memanggil API tulis, tidak menjadi jalur eksekusi live, tidak mengarang balasan AI.
-  Mode live hanya memetakan event SSE yang ada (`ready`, `heartbeat`) dan data API; perintah bisnis tetap nonaktif
-  sampai endpoint-nya ada (`app/game/commands.ts`, `docs/live-agent-event-mapping.md`, `docs/office-simulation.md`).
+  Mode live memetakan event SSE nyata (`ready`, `heartbeat`, `closed`, `agent.*`, `approval.*`) lewat
+  `mapRealtimeEvent` (`app/game/live-adapter.ts`) ke aksi presentasi saja; status bisnis selalu dibaca ulang dari API.
+  Perintah bisnis yang ada: Tugaskan (`POST /tasks`, dengan opsi persetujuan), Batalkan, Setujui/Tolak, Lihat hasil;
+  `chat`/`pause`/`resume` tetap nonaktif sampai endpoint-nya ada (`app/game/commands.ts`,
+  `docs/live-agent-event-mapping.md`, `docs/game-live-event-integration.md`, `docs/office-simulation.md`). Runtime
+  `fixture` wajib berlabel "Fixture (bukan AI)" di UI; SSE menutup koneksi (`closed`) saat otorisasi berubah
+  (`docs/secure-agent-realtime.md`).
 - Pemetaan agent → karakter/stasiun hanya presentasi (`app/utils/office-layout.ts`); nama agent tidak diubah.
 
 ## Test

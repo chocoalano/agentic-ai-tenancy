@@ -4,14 +4,17 @@ import type { ApiDependencies } from './container'
 import { createReadinessGate, type ReadinessGate } from './core/database/readiness'
 import { httpPlugin } from './core/http/http-plugin'
 import { agentRoutes } from './modules/agents/routes'
+import { approvalRoutes } from './modules/approvals/routes'
 import { authRoutes } from './modules/auth/routes'
 import { healthRoutes } from './modules/health/routes'
 import { membershipRoutes } from './modules/memberships/routes'
 import { realtimeRoutes } from './modules/realtime/routes'
+import { runRoutes } from './modules/runs/routes'
+import { taskRoutes } from './modules/tasks/routes'
 import { tenantRoutes } from './modules/tenants/routes'
 
 const API_DESCRIPTION = `
-API Agentic AI Virtual Office (Phase 1).
+API Agentic AI Virtual Office (Phase 5).
 
 **Autentikasi** — sesi berbasis cookie HttpOnly. Panggil \`POST /v1/auth/login\`; browser menyimpan cookie
 sesi secara otomatis. Token tidak pernah tersedia untuk JavaScript.
@@ -21,6 +24,10 @@ request tenant-scoped memverifikasi ulang keanggotaan aktif dan izin di database
 dalam transaksi dengan konteks RLS PostgreSQL.
 
 **CSRF** — request mutasi dari browser wajib same-origin (diperiksa via \`Sec-Fetch-Site\`/\`Origin\`).
+
+**Tugas & run** — \`POST /v1/tasks\` membuat tugas + run (queued) yang dieksekusi worker terpisah melalui AI
+Runtime yang dikonfigurasi server (tidak ada hasil yang dikarang; 409 \`RUNTIME_NOT_CONFIGURED\` bila runtime belum
+ada). Perubahan state dikirim lewat SSE (\`GET /v1/realtime/stream\`) dengan validasi ulang otorisasi berkala.
 
 **Error** — semua error berbentuk \`{ code, message, requestId?, details? }\`.
 `.trim()
@@ -49,7 +56,10 @@ export function createApi(deps: ApiDependencies, options: { readiness?: Readines
     )
     .use(membershipRoutes({ ...guarded, memberships: services.memberships }))
     .use(agentRoutes({ ...guarded, agents: services.agents }))
-    .use(realtimeRoutes(guarded))
+    .use(taskRoutes({ ...guarded, tasks: services.tasks }))
+    .use(runRoutes({ ...guarded, runs: services.runs }))
+    .use(approvalRoutes({ ...guarded, approvals: services.approvals }))
+    .use(realtimeRoutes({ ...guarded, sql: deps.sql, hub: deps.realtimeHub, logger: deps.logger }))
 
   return new Elysia()
     .use(httpPlugin({ ...deps, waitUntilReady: readiness.waitUntilReady }))
@@ -65,6 +75,8 @@ export function createApi(deps: ApiDependencies, options: { readiness?: Readines
             { name: 'Auth', description: 'Registrasi, login, logout, dan sesi' },
             { name: 'Tenants', description: 'Perusahaan, keanggotaan, dan pemilihan tenant' },
             { name: 'Agents', description: 'AI digital employee (tenant-scoped)' },
+            { name: 'Tasks', description: 'Tugas, run, dan hasil eksekusi AI employee' },
+            { name: 'Approvals', description: 'Persetujuan manusia yang dipersistenkan' },
             { name: 'Realtime', description: 'Server-Sent Events' },
           ],
           components: {

@@ -25,6 +25,8 @@
     "db:seed": "bun db/seeds/development.ts",
     "db:reset": "bun scripts/db-drop.ts && bun scripts/db-bootstrap.ts && bun scripts/db-migrate.ts",
     "api:standalone": "bun api/standalone.ts",
+    "worker": "bun api/worker.ts",
+    "test:worker": "bun test tests/integration/worker.test.ts tests/integration/tasks.test.ts tests/security/task-isolation.test.ts tests/security/sse-security.test.ts",
     "check:assets": "bun scripts/check-game-assets.ts",
     "assets:v2": "bun scripts/build-game-assets-v2.ts",
     "assets:audit": "bun scripts/audit-game-assets.ts",

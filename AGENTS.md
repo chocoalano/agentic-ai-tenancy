@@ -15,6 +15,8 @@ bun run test && bun run test:nuxt
 bun run build && bun run test:e2e
 ```
 
+Worker eksekusi agent: `bun run worker` (atau `AI_WORKER_INLINE=true`); test khusus `bun run test:worker`.
+
 ## Aturan
 
 1. Backend (`api/`): import relatif, tanpa alias Nuxt; route → service → repository; `api/index.ts` sinkron, tanpa `.listen()`.
@@ -48,3 +50,11 @@ bun run build && bun run test:e2e
     kerja mahal); IP klien hanya dari `api/core/http/client-ip.ts`, bukan header klien. Header keamanan HTML
     (CSP hash, HSTS opsional, no-store) di `server/plugins/security-headers.ts` — jangan menambah `unsafe-inline`
     pada `script-src`.
+15. Eksekusi agent (Phase 5): tugas/run/persetujuan hanya lewat `api/modules/{tasks,runs,approvals}`; worker
+    (`api/modules/runs/worker.ts`) adalah satu-satunya pemakai `withWorkerTransaction` (`app.actor='worker'`);
+    transisi status memakai `TASK_TRANSITIONS`/`RUN_TRANSITIONS` (`domains/tasks/types.ts`) dengan CAS; event realtime
+    hanya lewat outbox dalam transaksi yang sama (`enqueueRealtimeEvent`), payload tanpa prompt/keluaran model.
+    Runtime AI lewat `AgentRuntime` (`api/core/runtime/`): tanpa SDK tak terverifikasi, tanpa tool/shell/DB untuk model,
+    `fixture` bukan AI dan ditolak di production, usage hanya dari penyedia (jangan dikarang). Kunci API tidak pernah
+    di-log/dikirim ke klien. Lihat `docs/task-run-lifecycle.md`, `docs/agent-runtime-adapters.md`,
+    `docs/agent-worker-operations.md`, `docs/secure-agent-realtime.md`, `docs/agent-approval-workflow.md`.

@@ -5,10 +5,19 @@ import { toast } from 'vue-sonner'
 import { ACTIVITY_PRESENTATION } from '~/game/agent-state'
 import { STATION_ACTIVITY, parsePreviewInstruction } from '~/game/commands'
 import { defaultWorkstationActivity, workstationActivity } from '~/game/workstations'
-import { confirmationLabel, liveAgentSpecs, mapRealtimeEvent } from '~/game/live-adapter'
+import {
+  confirmationLabel,
+  liveAgentSpecs,
+  mapRealtimeEvent,
+  workActivityFor,
+  type LiveGameAction,
+} from '~/game/live-adapter'
 import { PREVIEW_CAST_BY_CHARACTER } from '~/game/preview-cast'
 import type { IslandId } from '~/game/world'
-import type { AgentSummary, TenantDetail } from '~/utils/api-types'
+import type { AgentSummary, RunOutput, TenantDetail } from '~/utils/api-types'
+import { ACTIVE_TENANT_HEADER } from '~~/domains/tenancy/headers'
+import { isTerminalTaskStatus } from '~~/domains/tasks/types'
+import type { LivePanelState } from '~/components/office/AgentCommandPanel.vue'
 import { CHARACTERS, centeringShift } from '~/utils/game-assets'
 import { MISSION_HUB, STATIONS, buildOfficeScene, characterForAgent, type StationId } from '~/utils/office-layout'
 import { deriveSetupMission } from '~/utils/office-mission'
@@ -31,7 +40,9 @@ import type { OfficeSelection } from '~/types/office'
  * Dua mode presentasi:
  * - LIVE: hanya AI employee nyata (nama, peran, status, ID). Robot berdiri di
  *   workstation hasil pemetaan presentasi; status = data otoritatif terakhir.
- *   Perintah bisnis dinonaktifkan (backend belum punya endpoint-nya).
+ *   "Tugaskan" membuat tugas NYATA (POST /v1/tasks); event SSE dari backend
+ *   (task/run/approval) menggerakkan robot — tidak ada penyelesaian yang
+ *   dikarang timer frontend. Chat/jeda/lanjut tetap nonaktif (tanpa endpoint).
  * - PRATINJAU/SIMULASI: lima karakter asset pack yang bergerak, teleport, dan
  *   bekerja menurut simulasi frontend berlabel (Project Atlas). Tidak ada yang
  *   ditulis ke backend.
@@ -45,6 +56,8 @@ const props = defineProps<{
 const emit = defineEmits<{ resync: [] }>()
 
 const realtime = useOfficeRealtime()
+const { $api } = useNuxtApp()
+const auth = useAuth()
 
 const preview = ref(props.agents.length === 0)
 const selection = ref<OfficeSelection | null>(null)
@@ -93,14 +106,33 @@ watch(
   },
 )
 
-// Mode live: event SSE nyata → sinkron ulang snapshot / konfirmasi status.
+// Mode live: event SSE nyata → sinkron ulang snapshot / konfirmasi status / aksi visual robot.
 watch(
   () => realtime.lastEvent.value,
   (event) => {
     if (!event) return
     for (const action of mapRealtimeEvent(event)) {
       if (action.type === 'confirm') lastConfirmed.value = action.serverTime
-      else if (action.type === 'resync' && !preview.value) emit('resync')
+      else if (action.type === 'resync') {
+        if (!preview.value) {
+          emit('resync')
+          liveRefresh.value += 1
+        }
+      } else if (action.type === 'closed') {
+        toast.warning('Koneksi realtime ditutup', {
+          description: REALTIME_CLOSED_LABELS[action.reason] ?? action.reason,
+        })
+      } else if (!preview.value) applyLiveAction(action)
+    }
+  },
+)
+// Celah replay terlalu besar → muat ulang snapshot otoritatif.
+watch(
+  () => realtime.resyncNeeded.value,
+  () => {
+    if (!preview.value) {
+      emit('resync')
+      liveRefresh.value += 1
     }
   },
 )
@@ -165,6 +197,195 @@ const selectedRole = computed(() => {
 
 function islandLabel(id: IslandId): string {
   return id === 'mission-hub' ? MISSION_HUB.label : (STATIONS.find((station) => station.id === id)?.label ?? id)
+}
+
+/* ---------------- Mode live: tugas nyata (backend otoritatif) ---------------- */
+const liveRefresh = ref(0)
+const requestOptions = () => ({ headers: { [ACTIVE_TENANT_HEADER]: auth.activeTenantId.value ?? '' } })
+
+const capabilities = useTenantAsyncData('task-capabilities', async (_tenantId, _signal, request) => {
+  if (preview.value) return null
+  const { data, error } = await $api.v1.tasks.capabilities.get(request)
+  if (error) {
+    if (error.status === 403) return null
+    throw apiFailure(error)
+  }
+  return data
+})
+
+const liveTasks = useTenantAsyncData('agent-tasks', async (_tenantId, _signal, request) => {
+  const agentId = selectedLive.value?.id
+  if (preview.value || !agentId) return null
+  const [tasks, approvals] = await Promise.all([
+    $api.v1.tasks.get({ query: { agentId, limit: 10 }, headers: request.headers, fetch: request.fetch }),
+    auth.can('approvals.read')
+      ? $api.v1.approvals.get({ query: { status: 'pending' }, headers: request.headers, fetch: request.fetch })
+      : Promise.resolve(null),
+  ])
+  if (tasks.error) throw apiFailure(tasks.error)
+  return {
+    agentId,
+    tasks: tasks.data.items,
+    pendingApproval: approvals?.data?.items.find((item) => item.agentId === agentId) ?? null,
+  }
+})
+watch([() => selectedLive.value?.id, liveRefresh, preview], () => {
+  if (!preview.value) {
+    void liveTasks.refresh()
+    if (liveRefresh.value > 0) void capabilities.refresh()
+  }
+})
+
+const submitting = ref(false)
+const liveError = ref<string | null>(null)
+const liveResult = ref<RunOutput | null>(null)
+const liveResultError = ref<string | null>(null)
+let pendingSubmission: { key: string; text: string; requiresApproval: boolean } | null = null
+
+/** Kirim tugas NYATA; kunci idempotensi dipakai ulang hanya untuk percobaan ulang teks yang sama. */
+async function assignTask(text: string, options: { requiresApproval: boolean }) {
+  const agent = selectedLive.value
+  if (preview.value || !agent) return
+  const instruction = text.trim()
+  if (
+    !pendingSubmission ||
+    pendingSubmission.text !== instruction ||
+    pendingSubmission.requiresApproval !== options.requiresApproval
+  ) {
+    pendingSubmission = { key: crypto.randomUUID(), text: instruction, requiresApproval: options.requiresApproval }
+  }
+  submitting.value = true
+  liveError.value = null
+  liveResult.value = null
+  try {
+    const { data, error } = await $api.v1.tasks.post(
+      {
+        agentId: agent.id,
+        instruction,
+        idempotencyKey: pendingSubmission.key,
+        requiresApproval: options.requiresApproval,
+      },
+      requestOptions(),
+    )
+    if (error) {
+      // Error nyata dari server: tidak ada eksekusi palsu, kunci dipertahankan untuk percobaan ulang.
+      liveError.value = toApiErrorInfo(error).message
+      return
+    }
+    pendingSubmission = null
+    feedback.value = `${data.created ? 'Tugas dibuat' : 'Tugas sudah ada'}: ${data.task.title} · ${TASK_STATUS_LABELS[data.task.status]}.`
+    // Umpan balik visual (presentasi); status bisnis tetap dari backend.
+    office.say(agent.id, 'Perintah diterima. Menunggu worker…', 3)
+    office.setActivity(agent.id, { state: 'thinking' })
+    liveRefresh.value += 1
+    emit('resync')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function cancelTask(taskId: string) {
+  if (preview.value) return
+  const { error } = await $api.v1.tasks({ id: taskId }).cancel.post({}, requestOptions())
+  if (error) liveError.value = toApiErrorInfo(error).message
+  else feedback.value = 'Pembatalan diminta ke server.'
+  liveRefresh.value += 1
+  emit('resync')
+}
+
+async function viewResult(runId: string) {
+  if (preview.value) return
+  liveResultError.value = null
+  const { data, error } = await $api.v1.runs({ id: runId }).output.get(requestOptions())
+  if (error) {
+    liveResultError.value = toApiErrorInfo(error).message
+    liveResult.value = null
+    return
+  }
+  liveResult.value = data
+}
+
+async function decideLive(approvalId: string, decision: 'approve' | 'reject') {
+  if (preview.value) return
+  const { error } = await $api.v1.approvals({ id: approvalId }).decide.post({ decision }, requestOptions())
+  if (error) liveError.value = toApiErrorInfo(error).message
+  else feedback.value = decision === 'approve' ? 'Hasil disetujui dan dirilis.' : 'Hasil ditolak.'
+  liveRefresh.value += 1
+  emit('resync')
+}
+
+const liveState = computed<LivePanelState | null>(() => {
+  if (preview.value || !selectedLive.value) return null
+  const loaded = liveTasks.data.value
+  const tasks = loaded && loaded.agentId === selectedLive.value.id ? loaded.tasks : []
+  const currentTask =
+    tasks.find((task) => task.id === selectedLive.value?.currentTaskId) ??
+    tasks.find((task) => !isTerminalTaskStatus(task.status)) ??
+    tasks[0] ??
+    null
+  return {
+    capabilities: capabilities.data.value ?? null,
+    tasks,
+    currentTask,
+    pendingApproval: loaded?.pendingApproval ?? null,
+    result: liveResult.value,
+    resultError: liveResultError.value,
+    submitting: submitting.value,
+    error: liveError.value,
+    loading: liveTasks.status.value === 'pending' || capabilities.status.value === 'pending',
+    canDecide: auth.can('approvals.decide'),
+    canCancel: auth.can('tasks.cancel'),
+  }
+})
+
+/** Event backend → presentasi robot (tidak mengubah state bisnis; robot hanya "mengikuti"). */
+function applyLiveAction(action: LiveGameAction) {
+  if (action.type === 'resync' || action.type === 'confirm' || action.type === 'closed') return
+  const key = action.agentId
+  if (!office.engine.agents.has(key)) return
+  const home = scene.value.placements.get(key)?.stationId ?? null
+  switch (action.type) {
+    case 'acknowledge':
+      office.say(key, `Perintah diterima: ${action.title}`, 3)
+      office.setActivity(key, { state: 'thinking' })
+      break
+    case 'queued':
+      office.setActivity(key, { state: 'thinking' })
+      break
+    case 'work': {
+      const state = home ? workActivityFor(STATION_ACTIVITY[home]) : 'working'
+      const agent = snapshot.value.agents.find((item) => item.key === key)
+      if (home && agent && agent.island !== home) office.moveTo(key, home, { state })
+      else office.setActivity(key, { state })
+      office.say(key, action.activity, 2.5)
+      break
+    }
+    case 'wait_approval':
+      office.setActivity(key, { state: 'waiting_approval' })
+      office.say(key, 'Hasil menunggu persetujuan.', 3)
+      break
+    case 'complete':
+      office.setActivity(key, { state: 'completed', seconds: 2, next: 'idle' })
+      office.say(key, action.released ? 'Tugas selesai — hasil tersedia.' : 'Tugas selesai.', 3)
+      toast.success('Tugas selesai', { description: `${islandLabelFor(key)}: hasil nyata tersimpan di riwayat tugas.` })
+      break
+    case 'fail':
+      office.setActivity(key, { state: 'failed', seconds: 2.5, next: action.retryScheduled ? 'thinking' : 'idle' })
+      office.say(key, action.errorMessage, 4)
+      break
+    case 'cancel':
+      office.setActivity(key, { state: 'idle' })
+      office.say(key, 'Tugas dibatalkan.', 2.5)
+      break
+    case 'task_changed':
+      break
+  }
+  liveRefresh.value += 1
+  if (action.type !== 'task_changed' && action.type !== 'work') emit('resync')
+}
+
+function islandLabelFor(key: string): string {
+  return props.agents.find((agent) => agent.id === key)?.name ?? 'AI employee'
 }
 
 function select(next: OfficeSelection | null) {
@@ -544,6 +765,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
         :role-title="selectedRole"
         :feedback="feedback"
         :confirmation="preview ? null : liveConfirmation"
+        :live="liveState"
         @close="select(null)"
         @move="moveAgent(selectedAgent.key, $event)"
         @instruct="instruct"
@@ -553,6 +775,10 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
         @reset-simulation="resetFromPanel"
         @approve="decideApproval(true)"
         @reject="decideApproval(false)"
+        @assign="assignTask"
+        @cancel-task="cancelTask"
+        @view-result="viewResult"
+        @decide="decideLive"
       />
       <GameQuickView
         v-else-if="selection.kind !== 'actor'"
