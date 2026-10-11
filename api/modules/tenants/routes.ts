@@ -1,8 +1,10 @@
 import { Elysia, t } from 'elysia'
 import { guardPlugin } from '../../core/auth/guard'
 import type { ApiConfig } from '../../core/config/env'
+import { errors } from '../../core/errors/app-error'
 import { ApiErrorSchema, protectedErrors, validationErrors } from '../../core/errors/schemas'
 import { requestIdOf } from '../../core/http/request-context'
+import type { RateLimiter } from '../../core/security/rate-limiter'
 import { IdParams, PermissionKeySchema, TenantContextSchema, TenantSchema, Uuid } from '../../shared/schemas'
 import type { AuthService } from '../auth/service'
 import type { MembershipService } from '../memberships/service'
@@ -35,6 +37,8 @@ const TenantDetailResponse = t.Object(
 export function tenantRoutes(deps: {
   config: ApiConfig
   auth: AuthService
+  /** Pembatas pembuatan perusahaan per pengguna. */
+  limits: { tenantCreate: RateLimiter }
   tenants: TenantService
   memberships: MembershipService
 }) {
@@ -71,6 +75,12 @@ export function tenantRoutes(deps: {
     .post(
       '',
       async ({ body, session, request, status }) => {
+        const decision = deps.limits.tenantCreate.consume(session.user.id)
+        if (!decision.allowed) {
+          throw errors.tooManyRequests('Terlalu banyak perusahaan dibuat dalam waktu singkat. Coba lagi nanti.', {
+            retryAfterSeconds: decision.retryAfterSeconds,
+          })
+        }
         const tenant = await tenants.create({
           userId: session.user.id,
           name: body.name,
@@ -81,7 +91,13 @@ export function tenantRoutes(deps: {
       {
         auth: true,
         body: t.Object({ name: t.String({ minLength: 2, maxLength: 120, description: 'Nama perusahaan' }) }),
-        response: { 201: TenantSchema, ...protectedErrors, 409: ApiErrorSchema, ...validationErrors },
+        response: {
+          201: TenantSchema,
+          ...protectedErrors,
+          409: ApiErrorSchema,
+          429: ApiErrorSchema,
+          ...validationErrors,
+        },
         detail: {
           summary: 'Buat perusahaan',
           description: 'Membuat tenant baru; pengguna menjadi owner. Tenant aktif sesi tidak berubah otomatis.',

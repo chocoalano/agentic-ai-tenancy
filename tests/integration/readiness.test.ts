@@ -24,6 +24,7 @@ const SAFE_REPORT: RuntimeRoleReport = {
   bypassesRls: false,
   ownedTables: [],
   tablesWithoutForcedRls: [],
+  unlistedTenantTables: [],
 }
 
 /** Error konektivitas NYATA dari driver Bun (port tertutup), bukan tiruan. */

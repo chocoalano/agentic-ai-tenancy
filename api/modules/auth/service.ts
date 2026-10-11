@@ -6,7 +6,7 @@ import type { ApiConfig } from '../../core/config/env'
 import { isUniqueViolation } from '../../core/database/errors'
 import { enterTenantBootstrap, withTransaction, withUserTransaction } from '../../core/database/transactions'
 import { AppError, errors } from '../../core/errors/app-error'
-import type { LoginThrottle } from '../../core/security/login-throttle'
+import type { RateLimiter } from '../../core/security/rate-limiter'
 import { resolveTenantContext } from '../../core/tenancy/resolve-context'
 import { membershipsRepository } from '../memberships/repository'
 import { createTenantSlug } from '../tenants/service'
@@ -26,14 +26,34 @@ export interface IssuedSession {
 interface RequestMeta {
   userAgent: string | null
   requestId: string
+  /** IP klien yang ditentukan server; '' bila tidak diketahui (pembatasan per IP dilewati). */
+  clientIp: string
+}
+
+/** Pembatas laju untuk alur autentikasi (lihat core/security/rate-limiter.ts). */
+export interface AuthRateLimits {
+  /** Percobaan masuk per email (dihitung SEBELUM verifikasi; sukses mereset). */
+  loginEmail: RateLimiter
+  /** Percobaan masuk per IP, apa pun emailnya (menahan password spraying). */
+  loginIp: RateLimiter
+  /** Registrasi per IP (setiap registrasi menjalankan Argon2). */
+  registerIp: RateLimiter
+}
+
+function enforce(limiter: RateLimiter, key: string, message: string) {
+  if (!key) return
+  const decision = limiter.consume(key)
+  if (!decision.allowed) {
+    throw errors.tooManyRequests(message, { retryAfterSeconds: decision.retryAfterSeconds })
+  }
 }
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-export function createAuthService(deps: { sql: SQL; config: ApiConfig; throttle: LoginThrottle }) {
-  const { sql, config, throttle } = deps
+export function createAuthService(deps: { sql: SQL; config: ApiConfig; limits: AuthRateLimits }) {
+  const { sql, config, limits } = deps
 
   function newSessionToken() {
     const token = generateSessionToken()
@@ -54,6 +74,8 @@ export function createAuthService(deps: { sql: SQL; config: ApiConfig; throttle:
       meta: RequestMeta,
     ): Promise<IssuedSession> {
       const email = normalizeEmail(input.email)
+      // Dibatasi per IP sebelum pekerjaan mahal (hash Argon2) — tanpa IP (tidak diketahui) dilewati.
+      enforce(limits.registerIp, meta.clientIp, 'Terlalu banyak registrasi dari alamat ini. Coba lagi nanti.')
       const passwordHash = await hashPassword(input.password)
       const issued = newSessionToken()
       try {
@@ -96,25 +118,22 @@ export function createAuthService(deps: { sql: SQL; config: ApiConfig; throttle:
 
     async login(input: { email: string; password: string }, meta: RequestMeta): Promise<IssuedSession> {
       const email = normalizeEmail(input.email)
-      const retryAfter = throttle.retryAfterSeconds(email)
-      if (retryAfter > 0) {
-        throw errors.tooManyRequests('Terlalu banyak percobaan masuk. Coba lagi nanti.', {
-          retryAfterSeconds: retryAfter,
-        })
-      }
+      // Keduanya dihitung ATOMIK sebelum verifikasi (bukan periksa-lalu-await-lalu-catat), sehingga
+      // request paralel tidak bisa melampaui batas: per IP (spraying banyak email) dan per email.
+      enforce(limits.loginIp, meta.clientIp, 'Terlalu banyak percobaan masuk dari alamat ini. Coba lagi nanti.')
+      enforce(limits.loginEmail, email, 'Terlalu banyak percobaan masuk. Coba lagi nanti.')
 
       const credentials = await usersRepository.findCredentialsByEmail(sql, email)
       if (!credentials) {
         await verifyAgainstDummyHash(input.password)
-        throttle.recordFailure(email)
         throw new AppError(401, 'INVALID_CREDENTIALS', 'Email atau kata sandi salah.')
       }
       const passwordValid = await verifyPassword(input.password, credentials.passwordHash)
       if (!passwordValid || credentials.status !== 'active') {
-        throttle.recordFailure(email)
         throw new AppError(401, 'INVALID_CREDENTIALS', 'Email atau kata sandi salah.')
       }
-      throttle.reset(email)
+      // Sukses: hitungan per email direset (bukan per IP — kuota IP tetap berjalan).
+      limits.loginEmail.reset(email)
 
       // Tenant awal = keanggotaan aktif pertama; tetap divalidasi ulang di setiap request.
       const memberships = await withUserTransaction(sql, credentials.id, (scope) =>

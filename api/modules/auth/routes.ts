@@ -3,6 +3,7 @@ import { guardPlugin } from '../../core/auth/guard'
 import { clearSessionCookie, setSessionCookie } from '../../core/auth/session-cookie'
 import type { ApiConfig } from '../../core/config/env'
 import { ApiErrorSchema, protectedErrors, validationErrors } from '../../core/errors/schemas'
+import { clientIpOf } from '../../core/http/client-ip'
 import { requestIdOf, userAgentOf } from '../../core/http/request-context'
 import { toPublicUser } from '../users/presenter'
 import { LoginBody, LogoutResponse, MeResponse, RegisterBody, SessionResponse } from './schemas'
@@ -25,14 +26,24 @@ export function authRoutes(deps: { config: ApiConfig; auth: AuthService }) {
     .use(guardPlugin({ config, auth }))
     .post(
       '/register',
-      async ({ body, cookie, request, status }) => {
-        const issued = await auth.register(body, { userAgent: userAgentOf(request), requestId: requestIdOf(request) })
+      async ({ body, cookie, request, server, status }) => {
+        const issued = await auth.register(body, {
+          userAgent: userAgentOf(request),
+          requestId: requestIdOf(request),
+          clientIp: clientIpOf(request, server),
+        })
         setSessionCookie(cookie, config, issued.token, issued.expiresAt)
         return status(201, toSessionResponse(issued))
       },
       {
         body: RegisterBody,
-        response: { 201: SessionResponse, 403: ApiErrorSchema, 409: ApiErrorSchema, ...validationErrors },
+        response: {
+          201: SessionResponse,
+          403: ApiErrorSchema,
+          409: ApiErrorSchema,
+          429: ApiErrorSchema,
+          ...validationErrors,
+        },
         detail: {
           summary: 'Registrasi pengguna',
           description:
@@ -43,8 +54,12 @@ export function authRoutes(deps: { config: ApiConfig; auth: AuthService }) {
     )
     .post(
       '/login',
-      async ({ body, cookie, request }) => {
-        const issued = await auth.login(body, { userAgent: userAgentOf(request), requestId: requestIdOf(request) })
+      async ({ body, cookie, request, server }) => {
+        const issued = await auth.login(body, {
+          userAgent: userAgentOf(request),
+          requestId: requestIdOf(request),
+          clientIp: clientIpOf(request, server),
+        })
         setSessionCookie(cookie, config, issued.token, issued.expiresAt)
         return toSessionResponse(issued)
       },

@@ -18,10 +18,16 @@ describe('loadApiConfig', () => {
     expect(() => loadApiConfig({ ...BASE, API_STANDALONE_PORT: '70000' })).toThrow(/API_STANDALONE_PORT/)
   })
 
-  test('production memaksa cookie Secure dengan prefix __Host-', () => {
+  test('production memaksa cookie Secure dengan prefix __Host- dan mematikan OpenAPI secara default', () => {
     const config = loadApiConfig({ ...BASE, NODE_ENV: 'production', SESSION_COOKIE_SECURE: 'false' })
     expect(config.session.cookieSecure).toBe(true)
     expect(config.session.cookieName).toBe('__Host-aivo_session')
+    expect(config.openapi.enabled).toBe(false)
+    expect(loadApiConfig({ ...BASE, NODE_ENV: 'production', OPENAPI_ENABLED: 'true' }).openapi.enabled).toBe(true)
+    expect(loadApiConfig({ ...BASE, NODE_ENV: 'development' }).openapi.enabled).toBe(true)
+    expect(config.security.rateLimit.loginPerIp).toEqual({ max: 30, windowMinutes: 15 })
+    expect(config.security.rateLimit.registerPerIp).toEqual({ max: 10, windowMinutes: 60 })
+    expect(config.security.rateLimit.tenantCreatePerUser).toEqual({ max: 10, windowMinutes: 60 })
   })
 
   test('menolak SESSION_SECRET kosong, pendek, atau nilai contoh', () => {

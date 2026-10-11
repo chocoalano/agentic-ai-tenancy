@@ -5,7 +5,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { SQL } from 'bun'
 import { describeRuntimeRoleProblems, inspectRuntimeRole, RLS_PROTECTED_TABLES } from '../../api/core/database/safety'
-import { withUserTransaction } from '../../api/core/database/transactions'
+import { withTenantTransaction, withUserTransaction } from '../../api/core/database/transactions'
 import { PERMISSION_KEYS } from '../../domains/auth/permissions'
 import { addAgents, createTestApp, ownerContext, registerOwner } from '../helpers/app'
 import { testDatabaseUrls } from '../helpers/env'
@@ -20,6 +20,7 @@ afterAll(async () => {
 let tenantA: string
 let tenantB: string
 let userA: string
+let userB: string
 let agentA: string
 let agentB: string
 
@@ -29,6 +30,7 @@ beforeAll(async () => {
   tenantA = a.tenantId
   tenantB = b.tenantId
   userA = a.userId
+  userB = b.userId
   agentA = (await addAgents(app, await ownerContext(app, a.userId, a.tenantId), [{ name: 'RLS Agent A' }]))[0] ?? ''
   agentB = (await addAgents(app, await ownerContext(app, b.userId, b.tenantId), [{ name: 'RLS Agent B' }]))[0] ?? ''
 })
@@ -151,20 +153,32 @@ describe('kebijakan RLS', () => {
     expect(row?.total).toBe(0)
   })
 
-  test('peran milik tenant lain tidak dapat ditautkan ke keanggotaan', async () => {
+  test('peran milik tenant lain tidak dapat ditautkan ke keanggotaan (bahkan oleh owner)', async () => {
     const contextA = await ownerContext(app, userA, tenantA)
-    const customRoleB = await asTenant(app.sql, tenantB, async (tx) => {
+    const contextB = await ownerContext(app, userB, tenantB)
+    // Peran kustom hanya bisa dibuat pemegang members.manage (owner B) — migrasi 0007.
+    const customRoleB = await withTenantTransaction(app.sql, contextB, async ({ sql: tx }) => {
       const [role] = await tx<{ id: string }[]>`
         insert into roles (tenant_id, key, name) values (${tenantB}, ${`custom-${crypto.randomUUID().slice(0, 6)}`}, 'Custom B')
         returning id
       `
       return role?.id ?? ''
     })
+    expect(customRoleB).not.toBe('')
+    const attempt = withTenantTransaction(
+      app.sql,
+      contextA,
+      ({ sql: tx }) =>
+        tx`insert into membership_roles (membership_id, tenant_id, role_id) values (${contextA.membershipId}, ${tenantA}, ${customRoleB})`,
+    )
+    await expect(attempt).rejects.toThrow()
+  })
+
+  test('konteks tenant TANPA pengguna (tidak ada izin) tidak dapat menulis peran kustom (migrasi 0007)', async () => {
     const attempt = asTenant(
       app.sql,
-      tenantA,
-      (tx) =>
-        tx`insert into membership_roles (membership_id, tenant_id, role_id) values (${contextA.membershipId}, ${tenantA}, ${customRoleB})`,
+      tenantB,
+      (tx) => tx`insert into roles (tenant_id, key, name) values (${tenantB}, 'tanpa-izin', 'Tanpa Izin') returning id`,
     )
     await expect(attempt).rejects.toThrow()
   })

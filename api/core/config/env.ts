@@ -28,6 +28,12 @@ export interface ApiConfig {
     trustedOrigins: string[]
     loginMaxFailures: number
     loginWindowMinutes: number
+    /** Pembatasan laju per alamat IP / pengguna (fixed window). */
+    rateLimit: {
+      loginPerIp: { max: number; windowMinutes: number }
+      registerPerIp: { max: number; windowMinutes: number }
+      tenantCreatePerUser: { max: number; windowMinutes: number }
+    }
   }
   openapi: {
     enabled: boolean
@@ -136,9 +142,24 @@ export function loadApiConfig(env: Env = process.env): ApiConfig {
       trustedOrigins: readOrigins(env, issues),
       loginMaxFailures: readInt(env, 'AUTH_LOGIN_MAX_FAILURES', 5, 1, 100, issues),
       loginWindowMinutes: readInt(env, 'AUTH_LOGIN_WINDOW_MINUTES', 15, 1, 24 * 60, issues),
+      rateLimit: {
+        loginPerIp: {
+          max: readInt(env, 'RATE_LIMIT_LOGIN_IP_MAX', 30, 1, 10_000, issues),
+          windowMinutes: readInt(env, 'RATE_LIMIT_LOGIN_IP_WINDOW_MINUTES', 15, 1, 24 * 60, issues),
+        },
+        registerPerIp: {
+          max: readInt(env, 'RATE_LIMIT_REGISTER_IP_MAX', 10, 1, 10_000, issues),
+          windowMinutes: readInt(env, 'RATE_LIMIT_REGISTER_IP_WINDOW_MINUTES', 60, 1, 24 * 60, issues),
+        },
+        tenantCreatePerUser: {
+          max: readInt(env, 'RATE_LIMIT_TENANT_CREATE_MAX', 10, 1, 10_000, issues),
+          windowMinutes: readInt(env, 'RATE_LIMIT_TENANT_CREATE_WINDOW_MINUTES', 60, 1, 24 * 60, issues),
+        },
+      },
     },
     openapi: {
-      enabled: readBool(env, 'OPENAPI_ENABLED', true, issues),
+      // Dokumentasi interaktif (Scalar) mati secara default di production; nyalakan eksplisit bila perlu.
+      enabled: readBool(env, 'OPENAPI_ENABLED', !isProduction, issues),
     },
     realtime: {
       heartbeatIntervalMs: readInt(env, 'REALTIME_HEARTBEAT_MS', 5_000, 1_000, 120_000, issues),

@@ -8,6 +8,8 @@ export interface RuntimeRoleReport {
   ownedTables: string[]
   /** Tabel tenant-scoped yang belum mengaktifkan atau memaksa RLS. */
   tablesWithoutForcedRls: string[]
+  /** Tabel ber-kolom `tenant_id` yang tidak terdaftar di RLS_PROTECTED_TABLES (lolos pengawasan). */
+  unlistedTenantTables: string[]
 }
 
 /** Tabel yang wajib dilindungi RLS dengan `FORCE ROW LEVEL SECURITY`. */
@@ -45,6 +47,17 @@ export async function inspectRuntimeRole(sql: SQL): Promise<RuntimeRoleReport> {
   `
   const present = new Set(tables.map((table) => table.table_name))
   const missing = RLS_PROTECTED_TABLES.filter((name) => !present.has(name))
+  // Setiap tabel yang membawa kolom tenant_id WAJIB ada di daftar (dan dengan demikian diperiksa FORCE RLS-nya).
+  // Dibaca dari pg_catalog (bukan information_schema, yang menyembunyikan tabel tanpa GRANT ke role ini).
+  const tenantColumns = await sql<{ table_name: string }[]>`
+    select c.relname as table_name
+    from pg_attribute a
+    join pg_class c on c.oid = a.attrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public' and c.relkind = 'r' and a.attname = 'tenant_id' and not a.attisdropped
+  `
+  const listed = new Set<string>(RLS_PROTECTED_TABLES)
+  const unlisted = tenantColumns.map((row) => row.table_name).filter((name) => !listed.has(name))
 
   return {
     role: role?.role ?? 'unknown',
@@ -55,6 +68,7 @@ export async function inspectRuntimeRole(sql: SQL): Promise<RuntimeRoleReport> {
       ...missing,
       ...tables.filter((table) => !table.rls_enabled || !table.rls_forced).map((table) => table.table_name),
     ],
+    unlistedTenantTables: unlisted,
   }
 }
 
@@ -67,6 +81,11 @@ export function describeRuntimeRoleProblems(report: RuntimeRoleReport): string[]
   }
   if (report.tablesWithoutForcedRls.length > 0) {
     problems.push(`tabel tanpa RLS/FORCE RLS atau belum dimigrasi: ${report.tablesWithoutForcedRls.join(', ')}`)
+  }
+  if (report.unlistedTenantTables.length > 0) {
+    problems.push(
+      `tabel ber-kolom tenant_id di luar RLS_PROTECTED_TABLES (tambahkan ke daftar + FORCE RLS): ${report.unlistedTenantTables.join(', ')}`,
+    )
   }
   return problems
 }

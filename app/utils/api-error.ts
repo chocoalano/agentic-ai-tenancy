@@ -36,6 +36,16 @@ export function toApiErrorInfo(error: { status: unknown; value: unknown }): ApiE
   return { status, code: 'NETWORK_ERROR', message: 'Tidak dapat terhubung ke server. Periksa koneksi Anda.' }
 }
 
+/** `ApiErrorInfo` dari error yang dibuat `apiFailure` (atau null bila bukan). */
+export function apiErrorInfoOf(error: unknown): ApiErrorInfo | null {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return null
+  const data = error.data
+  if (typeof data !== 'object' || data === null) return null
+  if (!('status' in data) || !('code' in data) || !('message' in data)) return null
+  if (typeof data.status !== 'number' || typeof data.code !== 'string' || typeof data.message !== 'string') return null
+  return { status: data.status, code: data.code, message: data.message }
+}
+
 /** Kode ApiError dari error yang dibuat `apiFailure` (atau null bila bukan). */
 export function apiErrorCodeOf(error: unknown): string | null {
   if (typeof error !== 'object' || error === null || !('data' in error)) return null

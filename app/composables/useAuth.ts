@@ -28,6 +28,8 @@ export function useAuth() {
   const { $api } = useNuxtApp()
   const router = useRouter()
   const state = useState<AuthState>('auth-state', () => ({ ...EMPTY_STATE }))
+  /** Kegagalan memuat konteks (backend/database tidak tersedia) — bukan "belum login". */
+  const loadFailure = useState<ApiErrorInfo | null>('auth-load-failure', () => null)
 
   const user = computed(() => state.value.user)
   const isAuthenticated = computed(() => state.value.user !== null)
@@ -60,10 +62,25 @@ export function useAuth() {
 
   async function refresh(): Promise<void> {
     state.value = await fetchContext()
+    loadFailure.value = null
   }
 
+  /**
+   * Memuat konteks sekali per kunjungan. Backend yang tidak tersedia TIDAK
+   * menggagalkan render halaman publik: kegagalannya dicatat di `loadFailure`
+   * (halaman terlindungi menampilkannya sebagai 503, lihat middleware/auth.ts).
+   */
   async function ensureLoaded(): Promise<void> {
-    if (!state.value.loaded) await refresh()
+    if (state.value.loaded) return
+    try {
+      await refresh()
+    } catch (error) {
+      loadFailure.value = apiErrorInfoOf(error) ?? {
+        status: 0,
+        code: 'NETWORK_ERROR',
+        message: 'Tidak dapat terhubung ke server. Periksa koneksi Anda.',
+      }
+    }
   }
 
   /** Membuang seluruh data tenant-scoped dari cache Nuxt. */
@@ -159,6 +176,7 @@ export function useAuth() {
 
   return {
     state: readonly(state),
+    loadFailure: readonly(loadFailure),
     user,
     isAuthenticated,
     activeTenant,

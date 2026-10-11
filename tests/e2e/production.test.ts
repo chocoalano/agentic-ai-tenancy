@@ -107,6 +107,8 @@ beforeAll(async () => {
       DATABASE_URL: testDatabaseUrls().app,
       SESSION_SECRET: TEST_SESSION_SECRET,
       REALTIME_HEARTBEAT_MS: '1000',
+      SECURITY_HSTS: 'true',
+      RATE_LIMIT_REGISTER_IP_MAX: '2',
     },
     stdout: 'pipe',
     stderr: 'pipe',
@@ -136,18 +138,60 @@ describe('server production (Bun + Nitro preset bun)', () => {
     expect(html).toContain('AI digital employee')
   })
 
-  test('melayani Elysia di /api/v1 dan OpenAPI di /api/openapi', async () => {
+  test('melayani Elysia di /api/v1; dokumentasi OpenAPI MATI secara default di production', async () => {
     const health = await fetch(`${base}/api/v1/health`)
     expect(health.status).toBe(200)
     expect(health.headers.get('x-request-id')).toBeTruthy()
     expect(await health.json()).toMatchObject({ status: 'ok', checks: { database: 'ok' } })
 
-    const ui = await fetch(`${base}/api/openapi`)
-    expect(ui.status).toBe(200)
-    expect(ui.headers.get('content-type')).toContain('text/html')
-    const spec = await fetch(`${base}/api/openapi/json`)
-    expect(spec.status).toBe(200)
-    expect(await spec.json()).toMatchObject({ servers: [{ url: '/api' }] })
+    expect((await fetch(`${base}/api/openapi`)).status).toBe(404)
+    expect((await fetch(`${base}/api/openapi/json`)).status).toBe(404)
+  })
+
+  test('header keamanan HTML: CSP dengan hash skrip inline (tanpa unsafe-inline/eval), HSTS bila diaktifkan', async () => {
+    const response = await fetch(`${base}/login`)
+    const csp = response.headers.get('content-security-policy') ?? ''
+    expect(csp).toContain("default-src 'self'")
+    expect(csp).toContain("frame-ancestors 'none'")
+    expect(csp).toContain("object-src 'none'")
+    expect(csp).not.toContain("script-src 'self' 'unsafe-inline'")
+    expect(csp).not.toContain('unsafe-eval')
+    expect(csp).toContain('upgrade-insecure-requests')
+    expect(response.headers.get('strict-transport-security')).toBe('max-age=31536000; includeSubDomains')
+    // Setiap skrip inline yang dirender harus ter-hash di CSP (kalau tidak, browser memblokirnya).
+    const html = await response.text()
+    const inline = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1] ?? '')
+    expect(inline.length).toBeGreaterThan(0)
+    const { createHash } = await import('node:crypto')
+    for (const body of inline) {
+      expect(csp).toContain(`'sha256-${createHash('sha256').update(body).digest('base64')}'`)
+    }
+  })
+
+  test('HTML yang dirender dengan cookie sesi memakai Cache-Control private, no-store (termasuk /)', async () => {
+    const cookie = await login(memberEmail)
+    const home = await fetch(`${base}/`, { headers: { cookie } })
+    expect(home.status).toBe(200)
+    expect(home.headers.get('cache-control')).toBe('private, no-store')
+    const anonymous = await fetch(`${base}/`)
+    expect(anonymous.headers.get('cache-control')).not.toBe('private, no-store')
+  })
+
+  test('IP klien diteruskan ke API lewat Nitro: registrasi per IP dibatasi (429) di mode mount', async () => {
+    const register = (prefix: string) =>
+      fetch(`${base}/api/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin: base, 'x-aivo-client-ip': '198.51.100.7' },
+        body: JSON.stringify({
+          email: `${prefix}-${Date.now()}@test.local`,
+          password: TEST_PASSWORD,
+          displayName: 'E2E',
+        }),
+      })
+    // Header palsu dari klien ditimpa middleware: ketiga request dihitung untuk 127.0.0.1, bukan 198.51.100.7.
+    const statuses = [await register('rl-a'), await register('rl-b'), await register('rl-c')].map((r) => r.status)
+    expect(statuses.slice(0, 2)).toEqual([201, 201])
+    expect(statuses[2]).toBe(429)
   })
 
   test('cookie sesi production memakai prefix __Host- dan atribut Secure', async () => {
@@ -288,9 +332,14 @@ describe('server production dengan database tidak terjangkau (gerbang kesiapan m
     expect(login.status).toBe(503)
   })
 
-  test('halaman publik tetap dirender (SSR) walau database tidak tersedia', async () => {
+  test('halaman publik tetap dirender (SSR) walau database tidak tersedia; HSTS tidak dipasang tanpa SECURITY_HSTS', async () => {
     const response = await fetch(`${degradedBase}/login`)
     expect(response.status).toBe(200)
     expect(await response.text()).toContain('<html')
+    expect(response.headers.get('strict-transport-security')).toBeNull()
+    expect(response.headers.get('content-security-policy')).toContain("default-src 'self'")
+    // Halaman terlindungi: 503 yang jujur (bukan 500, bukan redirect seolah belum login).
+    const office = await fetch(`${degradedBase}/office`, { redirect: 'manual' })
+    expect(office.status).toBe(503)
   })
 })

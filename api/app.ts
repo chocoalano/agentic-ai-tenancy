@@ -39,7 +39,14 @@ export function createApi(deps: ApiDependencies, options: { readiness?: Readines
   const v1 = new Elysia({ prefix: '/v1' })
     .use(healthRoutes({ readiness }))
     .use(authRoutes(guarded))
-    .use(tenantRoutes({ ...guarded, tenants: services.tenants, memberships: services.memberships }))
+    .use(
+      tenantRoutes({
+        ...guarded,
+        tenants: services.tenants,
+        memberships: services.memberships,
+        limits: { tenantCreate: deps.limits.tenantCreate },
+      }),
+    )
     .use(membershipRoutes({ ...guarded, memberships: services.memberships }))
     .use(agentRoutes({ ...guarded, agents: services.agents }))
     .use(realtimeRoutes(guarded))
