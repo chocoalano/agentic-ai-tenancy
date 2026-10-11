@@ -450,3 +450,149 @@
 @utility animate-cloud-pan {
   animation: cloud-pan var(--office-duration, 60s) ease-in-out infinite;
 }
+
+/* Efek workstation, penerimaan perintah, dan ambient (hanya transform/opacity; motion-safe). */
+@keyframes office-signal {
+  0% {
+    transform: translate(-50%, -50%) scale(0.4);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.9);
+    opacity: 0;
+  }
+}
+
+@keyframes holo-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(10%) scale(0.9);
+  }
+  20%,
+  75% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-12%) scale(1.03);
+  }
+}
+
+@keyframes holo-bars {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes term-line {
+  0% {
+    transform: scaleX(0);
+  }
+  55%,
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes type-blink {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes office-burst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes office-ack {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes ambient-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  30%,
+  70% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes error-flicker {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  25% {
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.35;
+  }
+  75% {
+    opacity: 0.85;
+  }
+}
+
+@utility animate-office-signal {
+  animation: office-signal 2.4s ease-out infinite;
+}
+
+@utility animate-holo-rise {
+  animation: holo-rise 2.7s ease-in-out infinite;
+}
+
+@utility animate-holo-bars {
+  animation: holo-bars 1.8s ease-in-out infinite;
+}
+
+@utility animate-term-line {
+  animation: term-line 1.6s steps(12, end) infinite;
+}
+
+@utility animate-type-blink {
+  animation: type-blink 0.5s ease-in-out infinite;
+}
+
+@utility animate-office-burst {
+  animation: office-burst 1.4s ease-out 1 forwards;
+}
+
+@utility animate-office-ack {
+  animation: office-ack 0.7s ease-out infinite;
+}
+
+@utility animate-ambient-glow {
+  animation: ambient-glow 2.6s ease-in-out 1 forwards;
+}
+
+@utility animate-error-flicker {
+  animation: error-flicker 0.9s linear infinite;
+}

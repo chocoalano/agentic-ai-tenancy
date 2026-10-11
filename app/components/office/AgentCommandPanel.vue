@@ -34,6 +34,8 @@ const emit = defineEmits<{
   instruct: [text: string]
   pauseAgent: []
   resumeAgent: []
+  runAtlas: []
+  resetSimulation: []
   approve: []
   reject: []
 }>()
@@ -54,6 +56,9 @@ const destinations = computed(() => [
   })),
 ])
 const stationLabel = computed(() => destinations.value.find((item) => item.id === props.agent.island)?.label ?? '')
+const destinationLabel = computed(
+  () => destinations.value.find((item) => item.id === props.agent.destination)?.label ?? '…',
+)
 
 const SUGGESTIONS: Record<string, string> = {
   nova: 'Nova, lakukan riset pasar untuk Project Atlas.',
@@ -76,6 +81,8 @@ function run(command: CommandDefinition) {
   else if (command.key === 'inspect') showLog.value = !showLog.value
   else if (command.key === 'pause') emit('pauseAgent')
   else if (command.key === 'resume') emit('resumeAgent')
+  else if (command.key === 'run_atlas') emit('runAtlas')
+  else if (command.key === 'reset_simulation') emit('resetSimulation')
 }
 
 function submit() {
@@ -120,7 +127,7 @@ function submit() {
       </div>
     </div>
 
-    <dl class="mt-2.5 grid grid-cols-2 gap-1.5 text-[11px] sm:grid-cols-4">
+    <dl class="mt-2.5 grid grid-cols-2 gap-1.5 text-[11px] sm:grid-cols-5">
       <div class="hud-segment px-2 py-1">
         <dt class="text-muted-foreground">Status</dt>
         <dd class="font-semibold">{{ agent.label }}</dd>
@@ -130,9 +137,19 @@ function submit() {
         <dd class="truncate font-semibold">{{ preview ? 'Simulasi frontend' : RUNTIME_DISCONNECTED.label }}</dd>
       </div>
       <div class="hud-segment px-2 py-1">
+        <dt class="text-muted-foreground">Workstation</dt>
+        <dd class="truncate font-semibold" data-agent-workstation>
+          {{ agent.moving ? `Menuju ${destinationLabel}` : stationLabel }}
+        </dd>
+      </div>
+      <div class="hud-segment px-2 py-1">
         <dt class="text-muted-foreground">Penugasan</dt>
-        <dd class="truncate font-semibold">
-          {{ preview ? `${agent.label} · ${stationLabel}` : 'Belum ada (modul tugas belum tersedia)' }}
+        <dd class="truncate font-semibold" data-agent-assignment>
+          {{
+            preview
+              ? (agent.workstationActivity ?? (agent.acknowledging ? 'Menerima perintah…' : agent.label))
+              : 'Belum ada (modul tugas belum tersedia)'
+          }}
         </dd>
       </div>
       <div class="hud-segment px-2 py-1">

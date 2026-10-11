@@ -4,15 +4,26 @@ import type { AgentRenderState } from './engine'
 /*
  * Renderer DOM Virtual Office: menulis gaya elemen robot & orb secara langsung
  * (CSS custom property `--ax/--ay`, posisi frame sheet, arah hadap, visibilitas,
- * kedalaman). Dipanggil dari loop requestAnimationFrame tunggal; hanya properti
- * yang berubah yang ditulis. Tanpa Vue agar bisa diuji dan tidak memicu
+ * kedalaman, serta atribut data arah/ambient/ack untuk CSS & pengujian).
+ * Dipanggil dari loop requestAnimationFrame tunggal; hanya properti yang
+ * berubah yang ditulis. Tanpa Vue agar bisa diuji dan tidak memicu
  * reaktivitas per frame.
  */
 
 interface RenderTarget {
   root: HTMLElement
   sprite: HTMLElement
-  last: { x: number; y: number; frame: string; facing: number; visible: boolean; depth: number }
+  last: {
+    x: number
+    y: number
+    frame: string
+    facing: number
+    heading: string
+    visible: boolean
+    depth: number
+    ambient: string | null
+    acknowledging: boolean
+  }
 }
 
 export interface OfficeDomRenderer {
@@ -32,7 +43,17 @@ export function createDomRenderer(): OfficeDomRenderer {
       targets.set(key, {
         root,
         sprite,
-        last: { x: Number.NaN, y: Number.NaN, frame: '', facing: 1, visible: true, depth: -1 },
+        last: {
+          x: Number.NaN,
+          y: Number.NaN,
+          frame: '',
+          facing: 1,
+          heading: '',
+          visible: true,
+          depth: -1,
+          ambient: null,
+          acknowledging: false,
+        },
       })
     },
     unregister(key) {
@@ -67,6 +88,10 @@ export function createDomRenderer(): OfficeDomRenderer {
             sprite.style.transform = state.facing < 0 ? 'scaleX(-1)' : ''
             last.facing = state.facing
           }
+          if (state.heading !== last.heading) {
+            sprite.dataset.heading = state.heading
+            last.heading = state.heading
+          }
           if (state.visible !== last.visible) {
             root.style.visibility = state.visible ? '' : 'hidden'
             last.visible = state.visible
@@ -74,6 +99,16 @@ export function createDomRenderer(): OfficeDomRenderer {
           if (state.depth !== last.depth) {
             root.style.zIndex = String(state.depth)
             last.depth = state.depth
+          }
+          if (state.ambient !== last.ambient) {
+            if (state.ambient) root.dataset.ambient = state.ambient
+            else delete root.dataset.ambient
+            last.ambient = state.ambient
+          }
+          if (state.acknowledging !== last.acknowledging) {
+            if (state.acknowledging) root.dataset.acknowledging = 'true'
+            else delete root.dataset.acknowledging
+            last.acknowledging = state.acknowledging
           }
         }
         const orb = orbs.get(state.key)

@@ -93,9 +93,11 @@ const MANUAL: Partial<Record<IslandKey, ManualGeometry>> = {
       { x: 0.5, y: 0.6 },
     ],
     navNode: { x: 0.5, y: 0.54 },
+    // Slot kiri dijauhkan dari pad portal (0.31, 0.49) agar robot yang menuju portal tidak
+    // menumpuk dengan robot yang bekerja di slot itu (klik jadi ambigu).
     slots: [
       { x: 0.64, y: 0.5 },
-      { x: 0.36, y: 0.5 },
+      { x: 0.42, y: 0.53 },
     ],
     portal: { x: 0.31, y: 0.49 },
     reason: 'platform cincin biru tidak terpisahkan dari batu tebing oleh warna',

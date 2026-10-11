@@ -1,9 +1,18 @@
 import type { InjectionKey, Ref } from 'vue'
 import { ACTIVITY_PRESENTATION, type ActivityState } from '~/game/agent-state'
+import { AmbientScheduler } from '~/game/ambient'
 import { createDomRenderer } from '~/game/dom-renderer'
-import { OfficeEngine, type ActivityPlan, type AgentSpec, type EngineEvent } from '~/game/engine'
+import {
+  OfficeEngine,
+  type ActivityPlan,
+  type AgentSpec,
+  type EngineEvent,
+  type Heading,
+  type MoveOptions,
+} from '~/game/engine'
 import { SimulationController, atlasAgentSpecs, type SimulationSnapshot } from '~/game/simulation'
 import { buildWorld, type IslandId } from '~/game/world'
+import { workstationActivity, workstationVisuals, type WorkstationVisual } from '~/game/workstations'
 import { CHARACTERS, type CharacterKey } from '~/utils/game-assets'
 
 /*
@@ -11,12 +20,16 @@ import { CHARACTERS, type CharacterKey } from '~/utils/game-assets'
  *
  * - Mesin & dunia dibuat saat setup (server & browser identik → posisi awal
  *   robot ikut di-SSR tanpa hydration mismatch).
- * - SATU loop requestAnimationFrame (hanya di browser) memajukan mesin dan
- *   simulasi, lalu renderer DOM menulis gaya elemen secara langsung — tidak ada
- *   pembaruan reaktif Vue per frame.
+ * - SATU loop requestAnimationFrame (hanya di browser) memajukan mesin,
+ *   simulasi, dan penjadwal ambient, lalu renderer DOM menulis gaya elemen
+ *   secara langsung — tidak ada pembaruan reaktif Vue per frame.
  * - `snapshot` (reaktif) hanya diperbarui saat event diskret: perubahan
- *   aktivitas, tiba, ucapan, teleport, daftar agent, simulasi.
+ *   aktivitas, tiba, ucapan, teleport, terima perintah, daftar agent,
+ *   simulasi, nyala/padam hologram ambient pulau.
  */
+
+/** Jeda "menerima perintah" (thinking) sebelum robot berangkat, detik simulasi. */
+export const COMMAND_ACK_SECONDS = 0.7
 
 export interface OfficeAgentView {
   key: string
@@ -30,6 +43,11 @@ export interface OfficeAgentView {
   speech: string | null
   moving: boolean
   destination: IslandId | null
+  heading: Heading
+  /** Sedang menerima perintah (sebelum berangkat). */
+  acknowledging: boolean
+  /** Label aktivitas workstation yang sedang dijalankan di stasiun ini (null bila tidak). */
+  workstationActivity: string | null
   /** Posisi kaki saat snapshot dibuat (posisi awal SSR). */
   x: number
   y: number
@@ -41,6 +59,10 @@ export interface OfficeSnapshot {
   activeStations: IslandId[]
   targetedStations: IslandId[]
   portalFlashes: IslandId[]
+  /** Efek workstation yang sedang aktif (diturunkan dari state agent). */
+  workstations: WorkstationVisual[]
+  /** Pulau yang hologramnya menyala secara ambient (pratinjau). */
+  ambientIslands: IslandId[]
   simulation: SimulationSnapshot | null
 }
 
@@ -70,6 +92,8 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
   const world = buildWorld()
   const engine = new OfficeEngine(world)
   const simulation = new SimulationController(engine)
+  const ambient = new AmbientScheduler(engine)
+  ambient.enabled = options.preview.value
   const logs = new Map<string, string[]>()
   const flashes = new Map<IslandId, number>()
   const stage = ref<HTMLElement | null>(null)
@@ -97,8 +121,12 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     const targeted = new Set<IslandId>()
     for (const agent of engine.agents.values()) {
       const presentation = ACTIVITY_PRESENTATION[agent.activity]
-      if (presentation.workstationActive && agent.route.length === 0) active.add(agent.island)
+      const moving = agent.route.length > 0
+      if (presentation.workstationActive && !moving) active.add(agent.island)
       if (agent.destination) targeted.add(agent.destination.island)
+      const station =
+        presentation.workstationActive && !moving ? workstationActivity(agent.island, agent.activity) : null
+      const acknowledging = agent.queued !== null
       agents.push({
         key: agent.key,
         character: agent.character,
@@ -107,10 +135,13 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
         island: agent.island,
         slot: agent.slot,
         activity: agent.activity,
-        label: presentation.label,
+        label: acknowledging ? 'Menerima perintah' : presentation.label,
         speech: agent.speech?.text ?? null,
-        moving: agent.route.length > 0,
+        moving,
         destination: agent.destination?.island ?? null,
+        heading: agent.heading,
+        acknowledging,
+        workstationActivity: acknowledging ? null : (station?.label ?? null),
         x: agent.position.x,
         y: agent.position.y,
         log: logs.get(agent.key) ?? [],
@@ -122,6 +153,17 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
       activeStations: [...active],
       targetedStations: [...targeted],
       portalFlashes: [...flashes.entries()].filter(([, until]) => until > now).map(([island]) => island),
+      workstations: workstationVisuals(
+        [...engine.agents.values()].map((agent) => ({
+          key: agent.key,
+          island: agent.island,
+          slot: agent.slot,
+          activity: agent.activity,
+          moving: agent.route.length > 0 || agent.queued !== null,
+          preview: agent.preview,
+        })),
+      ),
+      ambientIslands: ambient.snapshot().islands,
       simulation: options.preview.value ? simulation.snapshot() : null,
     }
   }
@@ -134,8 +176,11 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
   engine.on((event: EngineEvent) => {
     if (event.type === 'activity' && event.to !== 'moving') {
       const agent = engine.agents.get(event.key)
-      if (agent) appendLog(event.key, `${ACTIVITY_PRESENTATION[event.to].label} di ${islandLabel(agent.island)}`)
+      // Fase "menerima perintah" (thinking sebelum berangkat) dicatat lewat event acknowledge, bukan sebagai aktivitas.
+      if (agent && !agent.queued)
+        appendLog(event.key, `${ACTIVITY_PRESENTATION[event.to].label} di ${islandLabel(agent.island)}`)
     }
+    if (event.type === 'acknowledge') appendLog(event.key, `Menerima perintah → ${islandLabel(event.island)}`)
     if (event.type === 'route') appendLog(event.key, `Menuju ${islandLabel(event.island)}`)
     if (event.type === 'teleport') {
       flashes.set(event.phase === 'in' ? event.from : event.to, engine.time + 1.1)
@@ -145,6 +190,7 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     refresh()
   })
   simulation.onChange(refresh)
+  ambient.onChange(refresh)
 
   // Renderer DOM (dipanggil dari loop; menulis gaya langsung).
   const renderer = createDomRenderer()
@@ -169,6 +215,7 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     previous = now
     engine.tick(dt)
     simulation.update()
+    ambient.update()
     renderer.render(engine.renderStates())
     frames += 1
     worstFrame = Math.max(worstFrame, dt)
@@ -203,13 +250,16 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
   onBeforeUnmount(() => {
     cancelAnimationFrame(frameHandle)
     motion?.removeEventListener('change', onMotionChange)
+    ambient.dispose()
   })
 
   // Pergantian mode / data live.
-  watch(options.preview, () => {
+  watch(options.preview, (preview) => {
     simulation.reset(CHARACTER_NAMES)
     engine.setAgents([])
     engine.setAgents(initialSpecs())
+    ambient.reset()
+    ambient.enabled = preview
     logs.clear()
     refresh()
   })
@@ -222,8 +272,8 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     engine,
     snapshot,
     stage,
-    moveTo(key: string, island: IslandId, then?: ActivityPlan) {
-      return engine.moveTo(key, { island }, then)
+    moveTo(key: string, island: IslandId, then?: ActivityPlan, moveOptions?: MoveOptions) {
+      return engine.moveTo(key, { island }, then, moveOptions)
     },
     setActivity(key: string, plan: ActivityPlan) {
       return engine.setActivity(key, plan)
@@ -233,6 +283,7 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     },
     startSimulation(task: string) {
       if (simulation.status === 'completed') simulation.reset(CHARACTER_NAMES)
+      ambient.clear()
       simulation.start(task)
     },
     pauseSimulation: () => simulation.pause(),
@@ -241,6 +292,7 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     resumeActor: (key: string) => simulation.resumeActor(key),
     resetSimulation: () => {
       simulation.reset(CHARACTER_NAMES)
+      ambient.reset()
       logs.clear()
       refresh()
     },

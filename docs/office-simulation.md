@@ -143,3 +143,25 @@ Rekaman dan screenshot (`docs/screenshots/`):
 - Frame animasi masih prototipe prosedural (lihat `docs/character-animation-system.md`).
 - Pengurai instruksi berbasis kata kunci. Kalimat di luar kosakata tidak dipahami, dan hal ini disengaja: bukan AI.
 - Skenario tunggal (Project Atlas). Skenario lain dapat ditambahkan sebagai daftar fase baru tanpa mengubah mesin.
+
+## 8. Phase 4 — pembaruan kantor hidup
+
+- **Perintah dari panel** kini: Tugaskan · Chat · Pindah ke workstation · Lihat aktivitas · Jeda agent ·
+  Lanjutkan agent · **Jalankan Project Atlas** · **Reset simulasi** (dua yang terakhir hanya pratinjau, berlabel
+  SIM; di live nonaktif dengan alasan). Panel menampilkan bidang **Workstation** (stasiun saat ini / "Menuju …")
+  dan **Penugasan** = nama aktivitas workstation (mis. "Meriset sumber pasar") atau "Menerima perintah…".
+- **Umpan balik perintah**: robot disorot (cincin pilihan), menerima perintah dulu (`thinking` ±0,7 s dengan
+  lencana ⚡ dan gelembung "Siap, menuju …"), lalu berangkat; feedback panel "Simulasi: <nama> menerima perintah →
+  <stasiun> (<aktivitas>)". Skenario Project Atlas sendiri tidak memakai jeda penerimaan (deterministik, durasi
+  tidak bertambah).
+- **Aktivitas stasiun bernama & efek khas** per fase (`docs/workstation-interactions.md`): Nova "Mengoordinasikan
+  tim" (hologram misi + sinyal), Sage "Meriset sumber pasar" (dokumen hologram), Pixel "Menganalisis metrik"
+  (grafik), Bolt "Menyusun laporan" (mengetik + dokumen), Echo "Mengoperasikan alat data" (terminal + kontrol).
+  Fase 6: ledakan selesai di lima stasiun. Label robot dan roster memakai nama aktivitas ini.
+- **Ambient** saat siaga/antar fase (`docs/office-ambient-behavior.md`); ambient dibersihkan saat skenario dimulai
+  dan tidak pernah memindahkan robot. Jeda simulasi membekukan ambient.
+- **Posisi awal** tetap `ATLAS_START`; slot kiri Mission Hub digeser menjauhi pad portal agar Sage (menuju portal)
+  tidak menumpuk dengan Echo (slot kiri).
+- Verifikasi browser (build production): skenario tuntas ±41 dtk pada 1× (termasuk jeda reset), efek per fase
+  berbeda, pause/resume/reset/kecepatan berfungsi, 0 request tulis, 0 galat konsol; reduced motion tuntas 19 dtk
+  (`docs/frontend-visual-qa.md`). Rekaman: `docs/screenshots/office-living-p4.mp4`.

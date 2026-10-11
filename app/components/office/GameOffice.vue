@@ -4,6 +4,7 @@ import { onKeyStroke } from '@vueuse/core'
 import { toast } from 'vue-sonner'
 import { ACTIVITY_PRESENTATION } from '~/game/agent-state'
 import { STATION_ACTIVITY, parsePreviewInstruction } from '~/game/commands'
+import { defaultWorkstationActivity, workstationActivity } from '~/game/workstations'
 import { confirmationLabel, liveAgentSpecs, mapRealtimeEvent } from '~/game/live-adapter'
 import { PREVIEW_CAST_BY_CHARACTER } from '~/game/preview-cast'
 import type { IslandId } from '~/game/world'
@@ -127,7 +128,7 @@ const roster = computed<RosterEntry[]>(() =>
           roleTitle: cast.roleTitle,
           character: agent.character,
           lifecycle: null,
-          statusLabel: agent.moving ? 'Berpindah…' : agent.label,
+          statusLabel: agent.moving ? 'Berpindah…' : (agent.workstationActivity ?? agent.label),
           stationId: agent.island,
           level: cast.level,
           xp: cast.xp,
@@ -179,18 +180,27 @@ function togglePreview() {
   feedback.value = null
 }
 
-/** Pindahkan robot (pratinjau: + aktivitas stasiun; live: visual saja). */
+/** Jeda penerimaan perintah (robot "menerima" dulu, lalu berangkat) — hanya pratinjau. */
+const ackOptions = () => ({ acknowledgeSeconds: preview.value ? COMMAND_ACK_SECONDS : 0 })
+
+/** Pindahkan robot (pratinjau: terima perintah → jalan → aktivitas stasiun; live: visual saja). */
 function moveAgent(key: string, island: IslandId) {
   const agent = snapshot.value.agents.find((item) => item.key === key)
   if (!agent) return
   const plan = preview.value ? { state: STATION_ACTIVITY[island] } : undefined
-  if (!office.moveTo(key, island, plan)) {
+  if (!office.moveTo(key, island, plan, ackOptions())) {
     feedback.value = `${agent.name} tidak dapat dipindahkan (${agent.label}).`
     return
   }
-  office.say(key, preview.value ? `Menuju ${islandLabel(island)}.` : `Pindah ke ${islandLabel(island)} (visual).`, 2.5)
+  office.say(
+    key,
+    preview.value ? `Siap, menuju ${islandLabel(island)}.` : `Pindah ke ${islandLabel(island)} (visual).`,
+    2.5,
+  )
+  const activityLabel =
+    defaultWorkstationActivity(island)?.label ?? ACTIVITY_PRESENTATION[STATION_ACTIVITY[island]].label
   feedback.value = preview.value
-    ? `Simulasi: ${agent.name} → ${islandLabel(island)} (${ACTIVITY_PRESENTATION[STATION_ACTIVITY[island]].label.toLowerCase()}).`
+    ? `Simulasi: ${agent.name} menerima perintah → ${islandLabel(island)} (${activityLabel.toLowerCase()}).`
     : `${agent.name} dipindahkan secara visual ke ${islandLabel(island)} — penugasan di backend tidak berubah.`
 }
 
@@ -232,10 +242,12 @@ function instruct(text: string) {
       'Simulasi hanya mengenali riset, analisis, laporan, alat, pengetahuan, brief, koordinasi, dan permintaan persetujuan.'
     return
   }
-  office.say(targetKey, `Siap! ${ACTIVITY_PRESENTATION[parsed.activity].label} di ${islandLabel(parsed.island)}.`, 3)
+  const activityLabel =
+    workstationActivity(parsed.island, parsed.activity)?.label ?? ACTIVITY_PRESENTATION[parsed.activity].label
+  office.say(targetKey, `Siap! ${activityLabel} di ${islandLabel(parsed.island)}.`, 3)
   if (target.island === parsed.island && !target.moving) office.setActivity(targetKey, { state: parsed.activity })
-  else office.moveTo(targetKey, parsed.island, { state: parsed.activity })
-  feedback.value = `Simulasi: ${target.name} → ${islandLabel(parsed.island)} (${ACTIVITY_PRESENTATION[parsed.activity].label.toLowerCase()}).`
+  else office.moveTo(targetKey, parsed.island, { state: parsed.activity }, ackOptions())
+  feedback.value = `Simulasi: ${target.name} menerima perintah → ${islandLabel(parsed.island)} (${activityLabel.toLowerCase()}).`
 }
 
 /** Jeda satu robot: gerak/aktivitas berhenti; rencana fasenya ditahan, bukan dibuang. */
@@ -271,6 +283,22 @@ function decideApproval(approved: boolean) {
 
 function startSimulation() {
   office.startSimulation('Lakukan riset pasar Project Atlas')
+}
+
+/** Dari panel robot: jalankan skenario (dunia dibiarkan terlihat) atau reset posisi simulasi. */
+function runAtlasFromPanel() {
+  if (!preview.value) return
+  startSimulation()
+  selection.value = null
+  toast('Simulasi Project Atlas dimulai', {
+    description: 'Skenario misi contoh berjalan — simulasi frontend, bukan AI nyata.',
+  })
+}
+
+function resetFromPanel() {
+  if (!preview.value) return
+  office.resetSimulation()
+  feedback.value = 'Simulasi direset: kelima karakter kembali ke posisi awal.'
 }
 
 watch(
@@ -350,6 +378,8 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
       :active-stations="snapshot.activeStations"
       :targeted-stations="snapshot.targetedStations"
       :portal-flashes="snapshot.portalFlashes"
+      :workstations="snapshot.workstations"
+      :ambient-islands="snapshot.ambientIslands"
       :mission-completed="mission.completed"
       :mission-total="mission.total"
       :preview="preview"
@@ -519,6 +549,8 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
         @instruct="instruct"
         @pause-agent="pauseAgent"
         @resume-agent="resumeAgent"
+        @run-atlas="runAtlasFromPanel"
+        @reset-simulation="resetFromPanel"
         @approve="decideApproval(true)"
         @reject="decideApproval(false)"
       />

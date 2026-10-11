@@ -1,6 +1,7 @@
 # Sistem Animasi Karakter
 
-Status animasi frame artist: **BELUM LENGKAP (INCOMPLETE)**. Sistem animasinya sendiri berfungsi penuh: kontrak sheet,
+Status animasi frame artist: **BELUM LENGKAP (INCOMPLETE) — produksi frame BLOCKED** (tidak ada tool generasi
+gambar/artist di lingkungan ini; spesifikasi handoff: `docs/game-asset-production.md` §4). Sistem animasinya sendiri berfungsi penuh: kontrak sheet,
 atlas, state machine, renderer, dan pengujian. Namun **frame-nya diturunkan secara prosedural** dari satu sprite statis
 per karakter (kualitas prototipe), bukan digambar artist. Rekonstruksi v3 saat ini mencakup latar dan pulau statis;
 frame karakter belum diganti (lihat `docs/game-asset-quality-report.md`).
@@ -249,3 +250,33 @@ Keduanya dikunci oleh test regresi (`tests/nuxt/office-renderer.test.ts`), yang 
 - Browser (puppeteer, dev dan production): animasi yang teramati selama skenario adalah `idle, communicate, think,
 walk, teleport, read, work, celebrate`; `error` teramati pada alur persetujuan yang ditolak. Rekaman ada di
   `docs/screenshots/office-sim-project-atlas.mp4`.
+
+## 8. Phase 4 — lapisan gerak & umpan balik (tanpa mengubah kontrak sheet)
+
+Sumber: `app/game/engine.ts`, `app/game/dom-renderer.ts`. Semua di bawah ini bekerja dengan sheet prosedural
+yang ada dan tidak perlu diubah saat frame artist tiba.
+
+- **Alur perintah** (pratinjau): `idle → thinking (menerima perintah, ±0,7 s; lencana ⚡ + cincin + label
+"Menerima perintah") → moving (walk → teleport masuk → orb → teleport keluar → walk) → aktivitas stasiun
+(read/work/communicate/think) → completed (celebrate) → idle`. Penerimaan dilakukan `moveTo(key, target, plan,
+{ acknowledgeSeconds })`: state `thinking` lewat state machine yang sama (transisi sah dari siaga/kerja), rute
+  diterbitkan oleh `tick` saat jedanya habis; pembatalan/aktivitas baru membuang perintah tertunda; reduced
+  motion dan robot yang sudah bergerak melewati jeda. Event `acknowledge` dicatat di log sebagai "Menerima
+  perintah → <stasiun>".
+- **Langkah mengikuti jarak**: frame `walk` = `floor(walked / STRIDE_UNITS × 8) % 8` dengan `STRIDE_UNITS` = 64
+  unit dunia (pada kecepatan penuh ≈ 12 fps seperti kontrak), bukan jam — kaki tidak meluncur saat
+  akselerasi/deselerasi maupun pada kecepatan simulasi 0,5×/2×; jeda membekukan frame (diuji).
+- **Arah hadap 4 sisi**: `heading` (`left`/`right`/`toward`/`away`) dari vektor gerak (komponen horizontal
+  dominan → kiri/kanan; selain itu menghadap/membelakangi kamera); keluar portal selalu `toward`. Renderer
+  menulis `data-heading`. **Fallback terdokumentasi:** sheet hanya punya baris `walk` menghadap kanan (+cermin),
+  jadi `toward`/`away` masih memakai baris itu — arah depan/belakang BELUM selesai secara visual sampai baris
+  `walk-toward`/`walk-away` digambar (`docs/game-asset-production.md`).
+- **Offset fase idle**: `phaseOffsetFor(key)` (0–1,5 s, deterministik) agar animasi loop kelima robot tidak
+  serempak; reduced motion tetap frame 0.
+- **Overlay ambient**: animasi singkat saat siaga (`think`/`read`/`communicate`/menoleh) yang dijadwalkan
+  `AmbientScheduler` — hanya render, kalah oleh aktivitas apa pun (`docs/office-ambient-behavior.md`).
+- **Umpan balik seleksi & kontak tanah** (`OfficeActor.vue`): cincin sorotan saat dipilih (`data-actor-selection`),
+  bayangan kontak elips di kaki (`data-actor-shadow`), label robot memakai nama aktivitas workstation saat
+  bekerja (`docs/workstation-interactions.md`).
+- **Pengujian**: `tests/unit/office-engine.test.ts` ("penerimaan perintah, langkah berbasis jarak, arah hadap,
+  offset fase", 6 test) dan `tests/nuxt/office-living.test.ts` (indikator ack, sorotan, bayangan, label aktivitas).

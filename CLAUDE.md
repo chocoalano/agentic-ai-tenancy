@@ -111,7 +111,16 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
   simulasi, perintah, adaptor live, renderer DOM. SATU loop `requestAnimationFrame` (`useOfficeEngine`); renderer
   menulis gaya DOM langsung — jangan memicu reaktivitas Vue per frame atau membuat loop per komponen. Robot memakai
   sprite sheet `agents/{karakter}/sheet.webp` + `atlas.json` dengan kontrak `app/game/animation-spec.ts` (frame saat
-  ini prosedural = prototipe). Detail: `docs/character-animation-system.md`, `docs/office-navigation-system.md`.
+  ini prosedural = prototipe; tanpa tool generasi gambar/artist statusnya BLOCKED — jangan menyebutnya frame
+  artist; spesifikasi handoff di `docs/game-asset-production.md`). Detail: `docs/character-animation-system.md`,
+  `docs/office-navigation-system.md`.
+- Lapisan "kantor hidup" (Phase 4): `app/game/workstations.ts` = aktivitas & efek per stasiun yang DITURUNKAN dari
+  state agent (bukan state kedua; `workstationVisuals`), `app/game/ambient.ts` = perilaku siaga deterministik
+  (overlay render saja; prioritas perintah > misi > workstation > ambient; ikut jam mesin; mati pada reduced motion),
+  penerimaan perintah `engine.moveTo(key, target, plan, { acknowledgeSeconds })` (thinking → berangkat), frame jalan
+  berbasis jarak (`STRIDE_UNITS`), `heading` 4 arah (fallback: baris kanan + cermin). Efek dirender
+  `OfficeWorkstationEffects.vue` per snapshot (fx pack + glyph hologram prosedural), bukan per frame. Lihat
+  `docs/workstation-interactions.md`, `docs/office-ambient-behavior.md`, `docs/game-performance.md`.
 - Mode pratinjau (`app/game/simulation.ts`, `app/utils/office-preview.ts`) hanya simulasi frontend berlabel
   SIMULASI/DEMO: tidak pernah memanggil API tulis, tidak menjadi jalur eksekusi live, tidak mengarang balasan AI.
   Mode live hanya memetakan event SSE yang ada (`ready`, `heartbeat`) dan data API; perintah bisnis tetap nonaktif

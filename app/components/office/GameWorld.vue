@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { OfficeAgentView } from '~/composables/useOfficeEngine'
 import type { IslandId } from '~/game/world'
+import type { WorkstationVisual } from '~/game/workstations'
 import { MISSION_HUB, OFFICE_WORLD, STATIONS, type StationId, type StationState } from '~/utils/office-layout'
 import type { OfficeSelection } from '~/types/office'
 
@@ -26,6 +27,9 @@ const props = defineProps<{
   activeStations: readonly IslandId[]
   targetedStations: readonly IslandId[]
   portalFlashes: readonly IslandId[]
+  /** Efek workstation aktif (diturunkan dari state agent) dan hologram pulau ambient. */
+  workstations?: readonly WorkstationVisual[]
+  ambientIslands?: readonly IslandId[]
   missionCompleted: number
   missionTotal: number
   preview: boolean
@@ -232,6 +236,7 @@ defineExpose({
           :selected="isStationSelected(station.id)"
           :active="activeStations.includes(station.id)"
           :targeted="targetedStations.includes(station.id)"
+          :ambient="(ambientIslands ?? []).includes(station.id)"
           :index="index"
           @select="emit('select', { kind: 'station', stationId: station.id })"
         />
@@ -244,10 +249,13 @@ defineExpose({
         :selected="selection?.kind === 'hub'"
         :active="activeStations.includes('mission-hub')"
         :targeted="targetedStations.includes('mission-hub')"
+        :ambient="(ambientIslands ?? []).includes('mission-hub')"
         @select="emit('select', { kind: 'hub' })"
       />
 
       <OfficeEffects class="z-50" :portal-flashes="portalFlashes" />
+      <!-- Efek workstation & hologram ambient: anak langsung panggung agar kedalamannya berbaur dengan robot. -->
+      <OfficeWorkstationEffects :visuals="workstations ?? []" :ambient-islands="ambientIslands ?? []" />
       <!-- Overlay kalibrasi geometri: hanya `nuxt dev` + ?debug=geometry (tidak ada di production). -->
       <OfficeGeometryDebug v-if="debugGeometry" />
 

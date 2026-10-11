@@ -84,4 +84,7 @@ Garuda Logistik), `bima@garuda.test`, `citra@nusantara.test`.
 - Virtual Office: [kualitas aset](docs/game-asset-quality-report.md) · [integrasi aset](docs/asset-integration-report.md)
   · [animasi karakter](docs/character-animation-system.md) · [navigasi & geometri pulau](docs/office-navigation-system.md)
   · [simulasi](docs/office-simulation.md) · [pemetaan event live & konsistensi tenant](docs/live-agent-event-mapping.md)
+  · [interaksi workstation](docs/workstation-interactions.md) · [perilaku ambient](docs/office-ambient-behavior.md)
+  · [performa](docs/game-performance.md) · [QA visual](docs/frontend-visual-qa.md)
+  · [produksi aset](docs/game-asset-production.md) · [laporan Phase 4](docs/phase4-living-office-report.md)
 - [CLAUDE.md](CLAUDE.md) / [AGENTS.md](AGENTS.md) — instruksi untuk AI coding agent

@@ -13,6 +13,8 @@ const props = defineProps<{
   selected?: boolean
   active?: boolean
   targeted?: boolean
+  /** Hologram kristal menyala sebentar secara ambient (pratinjau). */
+  ambient?: boolean
 }>()
 
 const emit = defineEmits<{ select: [] }>()
@@ -43,7 +45,7 @@ const accessibleLabel = computed(
     <span
       :class="[
         'pointer-events-none absolute left-1/2 top-[22%] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,oklch(0.85_0.15_210/55%),oklch(0.7_0.18_230/18%)_45%,transparent_70%)] motion-safe:animate-glow-breathe',
-        active ? 'w-[95%]' : 'w-[70%]',
+        active ? 'w-[95%]' : ambient ? 'w-[84%]' : 'w-[70%]',
       ]"
       aria-hidden="true"
     />

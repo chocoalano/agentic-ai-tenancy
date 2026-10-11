@@ -1,4 +1,5 @@
 import type { CharacterKey } from '../utils/game-assets'
+import { stableHash } from '../utils/office-layout'
 import { ACTIVITY_PRESENTATION, canTransition, type ActivityState } from './agent-state'
 import { AGENT_ANIMATIONS, type AgentAnimationName } from './animation-spec'
 import { findRoute, type RouteLeg, type TeleportLeg } from './navigation'
@@ -12,8 +13,21 @@ import type { IslandId, Point, World } from './world'
  *   machine), rute (leg jalan/teleport), animasi + frame, ucapan.
  * - `tick(dt)` dipanggil dari SATU loop requestAnimationFrame milik pemanggil;
  *   hasilnya dibaca renderer lewat `renderStates()` tanpa reaktivitas Vue.
- * - Perubahan diskret (aktivitas, tiba, ucapan, mulai teleport) dikirim
- *   sebagai event agar UI Vue hanya diperbarui saat perlu.
+ * - Perubahan diskret (aktivitas, tiba, ucapan, mulai teleport, terima
+ *   perintah) dikirim sebagai event agar UI Vue hanya diperbarui saat perlu.
+ *
+ * Lapisan visual yang TIDAK mengubah state bisnis:
+ * - `heading` (kiri/kanan/menghadap/membelakangi kamera) dari vektor gerak;
+ *   sheet saat ini hanya punya baris kanan (+cermin) → arah depan/belakang
+ *   memakai fallback baris itu, terdokumentasi di docs/character-animation-system.md.
+ * - Frame jalan mengikuti JARAK tempuh (`walked`), bukan jam, sehingga kaki
+ *   tidak meluncur saat akselerasi/deselerasi atau kecepatan simulasi berubah.
+ * - `phaseOffset` deterministik per agent agar animasi loop lima robot tidak
+ *   serempak.
+ * - `ambient`: overlay animasi singkat saat SIAGA (menoleh, merenung, …) yang
+ *   dijadwalkan AmbientScheduler; otomatis kalah oleh perintah/aktivitas apa pun.
+ * - Penerimaan perintah (`acknowledgeSeconds`): state `thinking` sejenak
+ *   sebelum berangkat, lalu rute diterbitkan oleh `tick`.
  */
 
 export interface AgentSpec {
@@ -33,6 +47,27 @@ export interface ActivityPlan {
   next?: ActivityState
 }
 
+export type Heading = 'left' | 'right' | 'toward' | 'away'
+
+/** Overlay ambient: animasi singkat saat siaga (visual saja, bukan state bisnis). */
+export interface AmbientOverlay {
+  id: string
+  animation: AgentAnimationName
+  until: number
+  /** Arah hadap selama overlay (menoleh); default menghadap kanan. */
+  facing?: 1 | -1
+}
+
+export interface MoveOptions {
+  /** Jeda "menerima perintah" (state `thinking`) sebelum berangkat; 0/undefined = langsung. */
+  acknowledgeSeconds?: number
+}
+
+interface QueuedMove {
+  target: { island: IslandId; slot?: number | null }
+  then: ActivityPlan | null
+}
+
 interface TeleportRun {
   leg: TeleportLeg
   phase: 'in' | 'transit' | 'out'
@@ -50,6 +85,7 @@ export interface AgentRuntime {
   island: IslandId
   slot: number | null
   facing: 1 | -1
+  heading: Heading
   activity: ActivityState
   activityStarted: number
   activityUntil: number | null
@@ -57,13 +93,21 @@ export interface AgentRuntime {
   route: RouteLeg[]
   legIndex: number
   legDistance: number
+  /** Jarak jalan kumulatif rute saat ini (unit dunia); frame walk mengikuti nilai ini. */
+  walked: number
   teleport: TeleportRun | null
   destination: { island: IslandId; slot: number | null } | null
   onArrive: ActivityPlan | null
   speech: { text: string; until: number } | null
   animationStarted: number
-  /** Kunci animasi terakhir (nama, atau `teleport:<fase>` agar fase keluar memulai ulang frame). */
+  /** Kunci animasi terakhir (nama, `teleport:<fase>`, atau `ambient:<id>`) agar pewaktuan frame dimulai ulang. */
   lastAnimation: string
+  /** Offset fase animasi loop (detik), deterministik dari kunci agent. */
+  phaseOffset: number
+  ambient: AmbientOverlay | null
+  /** Perintah yang sedang "diterima" (thinking) dan akan diberangkatkan oleh tick. */
+  queued: QueuedMove | null
+  acknowledgeUntil: number | null
   orb: Point | null
   visible: boolean
 }
@@ -73,11 +117,16 @@ export interface AgentRenderState {
   x: number
   y: number
   facing: 1 | -1
+  heading: Heading
   animation: AgentAnimationName
   frame: number
   visible: boolean
   depth: number
   orb: Point | null
+  /** Id overlay ambient yang sedang diputar (null = tidak ada). */
+  ambient: string | null
+  /** Sedang menerima perintah (sebelum berangkat). */
+  acknowledging: boolean
 }
 
 export type EngineEvent =
@@ -85,6 +134,7 @@ export type EngineEvent =
   | { type: 'arrived'; key: string; island: IslandId; slot: number | null }
   | { type: 'route'; key: string; island: IslandId; slot: number | null }
   | { type: 'teleport'; key: string; from: IslandId; to: IslandId; phase: 'in' | 'out' }
+  | { type: 'acknowledge'; key: string; island: IslandId }
   | { type: 'speech'; key: string }
   | { type: 'agents' }
   | { type: 'clock' }
@@ -101,6 +151,10 @@ const ACCEL_DISTANCE = 36
 const MIN_SPEED_RATIO = 0.25
 /** Lama state `completed` (animasi celebrate) sebelum kembali siaga, detik. */
 const COMPLETED_HOLD = 2
+/** Jarak tempuh satu siklus animasi jalan (unit dunia) — pada kecepatan penuh ≈ 12 fps seperti kontrak sheet. */
+export const STRIDE_UNITS = 64
+/** Rentang offset fase animasi loop per agent (detik). */
+const PHASE_OFFSET_RANGE = 1.5
 
 function distance(a: Point, b: Point): number {
   const dx = b.x - a.x
@@ -119,7 +173,7 @@ function legLength(points: readonly Point[]): number {
 }
 
 /** Titik pada polyline setelah menempuh `s` unit; juga arah segmen. */
-function pointAlong(points: readonly Point[], s: number): { point: Point; dx: number } {
+function pointAlong(points: readonly Point[], s: number): { point: Point; dx: number; dy: number } {
   let remaining = s
   for (let index = 1; index < points.length; index += 1) {
     const a = points[index - 1]
@@ -128,12 +182,12 @@ function pointAlong(points: readonly Point[], s: number): { point: Point; dx: nu
     const length = distance(a, b)
     if (remaining <= length || index === points.length - 1) {
       const t = length === 0 ? 1 : Math.min(1, remaining / length)
-      return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, dx: b.x - a.x }
+      return { point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, dx: b.x - a.x, dy: b.y - a.y }
     }
     remaining -= length
   }
   const last = points[points.length - 1] ?? { x: 0, y: 0 }
-  return { point: last, dx: 0 }
+  return { point: last, dx: 0, dy: 0 }
 }
 
 function quadratic(from: Point, control: Point, to: Point, t: number): Point {
@@ -142,6 +196,23 @@ function quadratic(from: Point, control: Point, to: Point, t: number): Point {
     x: u * u * from.x + 2 * u * t * control.x + t * t * to.x,
     y: u * u * from.y + 2 * u * t * control.y + t * t * to.y,
   }
+}
+
+/**
+ * Arah hadap isometrik dari vektor gerak: komponen horizontal dominan → kiri/kanan,
+ * selain itu menghadap (turun di layar) / membelakangi kamera (naik di layar).
+ */
+export function headingOf(dx: number, dy: number, previous: Heading): Heading {
+  const ax = Math.abs(dx)
+  const ay = Math.abs(dy)
+  if (ax < 0.5 && ay < 0.5) return previous
+  if (ax >= ay * 0.75) return dx > 0 ? 'right' : 'left'
+  return dy > 0 ? 'toward' : 'away'
+}
+
+/** Offset fase deterministik (0 … PHASE_OFFSET_RANGE detik) dari kunci agent. */
+export function phaseOffsetFor(key: string): number {
+  return ((stableHash(key) % 1000) / 1000) * PHASE_OFFSET_RANGE
 }
 
 export class OfficeEngine {
@@ -213,6 +284,7 @@ export class OfficeEngine {
         island: spec.island,
         slot: spec.slot,
         facing: 1,
+        heading: 'toward',
         activity: spec.activity,
         activityStarted: this.time,
         activityUntil: null,
@@ -220,12 +292,17 @@ export class OfficeEngine {
         route: [],
         legIndex: 0,
         legDistance: 0,
+        walked: 0,
         teleport: null,
         destination: null,
         onArrive: null,
         speech: null,
         animationStarted: this.time,
         lastAnimation: ACTIVITY_PRESENTATION[spec.activity].animation,
+        phaseOffset: phaseOffsetFor(spec.key),
+        ambient: null,
+        queued: null,
+        acknowledgeUntil: null,
         orb: null,
         visible: true,
       })
@@ -239,13 +316,24 @@ export class OfficeEngine {
     agent.activityStarted = this.time
     agent.activityUntil = plan?.seconds !== undefined ? this.time + plan.seconds : null
     agent.activityNext = plan?.next ?? (plan?.seconds !== undefined && state === 'completed' ? 'idle' : null)
+    // Perilaku ambient kalah oleh aktivitas apa pun (prioritas: perintah > misi > workstation > ambient).
+    agent.ambient = null
     if (from !== state) this.emit({ type: 'activity', key: agent.key, from, to: state })
+  }
+
+  /** Batalkan perintah yang sedang diterima (belum berangkat). */
+  private clearQueued(agent: AgentRuntime) {
+    if (!agent.queued) return
+    agent.queued = null
+    agent.acknowledgeUntil = null
+    agent.destination = null
   }
 
   /** Ubah aktivitas bila transisinya sah. Mengembalikan false bila ditolak. */
   setActivity(key: string, plan: ActivityPlan): boolean {
     const agent = this.agents.get(key)
     if (!agent || !canTransition(agent.activity, plan.state)) return false
+    this.clearQueued(agent)
     if (plan.state !== 'moving' && agent.route.length > 0) this.cancel(key)
     this.forceActivity(agent, plan.state, plan)
     return true
@@ -258,14 +346,56 @@ export class OfficeEngine {
     this.emit({ type: 'speech', key })
   }
 
+  /** Overlay ambient dapat diputar hanya saat siaga, tidak bergerak, tanpa perintah tertunda, dan bukan reduced motion. */
+  ambientApplies(agent: AgentRuntime): boolean {
+    return (
+      agent.activity === 'idle' &&
+      agent.route.length === 0 &&
+      agent.teleport === null &&
+      agent.queued === null &&
+      !this.reducedMotion
+    )
+  }
+
+  /** Pasang/lepas overlay ambient. Ditolak (false) bila agent sedang tidak siaga. */
+  setAmbient(key: string, overlay: AmbientOverlay | null): boolean {
+    const agent = this.agents.get(key)
+    if (!agent) return false
+    if (overlay === null) {
+      agent.ambient = null
+      return true
+    }
+    if (!this.ambientApplies(agent)) return false
+    agent.ambient = overlay
+    return true
+  }
+
   /**
    * Perintahkan agent menuju workstation. `then` dijalankan saat tiba.
+   * Dengan `acknowledgeSeconds`, agent "menerima perintah" (thinking) sejenak lalu berangkat.
    * Mengembalikan false bila rute tidak ditemukan atau transisi ditolak.
    */
-  moveTo(key: string, target: { island: IslandId; slot?: number | null }, then?: ActivityPlan): boolean {
+  moveTo(key: string, target: { island: IslandId; slot?: number | null }, then?: ActivityPlan, options?: MoveOptions) {
     const agent = this.agents.get(key)
     if (!agent || agent.activity === 'offline') return false
     if (!canTransition(agent.activity, 'moving') && agent.activity !== 'moving') return false
+    this.clearQueued(agent)
+    const ack = options?.acknowledgeSeconds ?? 0
+    if (ack > 0 && !this.reducedMotion && agent.route.length === 0 && canTransition(agent.activity, 'thinking')) {
+      const slot = target.slot === undefined ? this.freeSlot(target.island, key) : target.slot
+      agent.queued = { target: { island: target.island, slot }, then: then ?? null }
+      agent.acknowledgeUntil = this.time + ack
+      agent.destination = { island: target.island, slot }
+      this.forceActivity(agent, 'thinking')
+      this.emit({ type: 'acknowledge', key, island: target.island })
+      return true
+    }
+    return this.dispatch(agent, target, then)
+  }
+
+  /** Terbitkan rute sekarang (tanpa jeda penerimaan). */
+  private dispatch(agent: AgentRuntime, target: { island: IslandId; slot?: number | null }, then?: ActivityPlan) {
+    const key = agent.key
     const slot = target.slot === undefined ? this.freeSlot(target.island, key) : target.slot
     const destination = this.stationPoint(target.island, slot)
     // Sedang transit di jalur energi: selesaikan teleport dulu, lalu rute baru dari portal tujuan.
@@ -298,6 +428,7 @@ export class OfficeEngine {
       agent.route = route
       agent.legIndex = 0
       agent.legDistance = 0
+      agent.walked = 0
     }
     agent.slot = null
     if (agent.activity !== 'moving') this.forceActivity(agent, 'moving')
@@ -308,7 +439,13 @@ export class OfficeEngine {
   /** Hentikan rute (pembatalan). Teleport yang sedang transit tetap diselesaikan. */
   cancel(key: string) {
     const agent = this.agents.get(key)
-    if (!agent || agent.route.length === 0) return
+    if (!agent) return
+    if (agent.queued) {
+      this.clearQueued(agent)
+      this.forceActivity(agent, 'idle')
+      return
+    }
+    if (agent.route.length === 0) return
     if (agent.teleport) {
       agent.route = [agent.teleport.leg]
       agent.legIndex = 0
@@ -327,6 +464,7 @@ export class OfficeEngine {
     agent.route = []
     agent.legIndex = 0
     agent.legDistance = 0
+    agent.walked = 0
     agent.teleport = null
     agent.orb = null
     agent.visible = true
@@ -351,6 +489,15 @@ export class OfficeEngine {
         agent.speech = null
         this.emit({ type: 'speech', key: agent.key })
       }
+      if (agent.ambient && this.time >= agent.ambient.until) agent.ambient = null
+      // Perintah yang sudah "diterima": berangkat sekarang.
+      if (agent.queued && agent.acknowledgeUntil !== null && this.time >= agent.acknowledgeUntil) {
+        const queued = agent.queued
+        agent.queued = null
+        agent.acknowledgeUntil = null
+        this.dispatch(agent, queued.target, queued.then ?? undefined)
+        continue
+      }
       if (agent.route.length > 0) this.advance(agent, step)
       else if (agent.activityUntil !== null && this.time >= agent.activityUntil) {
         const next = agent.activityNext
@@ -374,9 +521,11 @@ export class OfficeEngine {
       const s = agent.legDistance
       const ratio = Math.max(MIN_SPEED_RATIO, Math.min(1, (s + 4) / ACCEL_DISTANCE, (total - s + 4) / ACCEL_DISTANCE))
       agent.legDistance = Math.min(total, s + this.walkSpeed * ratio * step)
-      const { point, dx } = pointAlong(leg.points, agent.legDistance)
+      agent.walked += agent.legDistance - s
+      const { point, dx, dy } = pointAlong(leg.points, agent.legDistance)
       agent.position = point
       if (Math.abs(dx) > 0.5) agent.facing = dx > 0 ? 1 : -1
+      agent.heading = headingOf(dx, dy, agent.heading)
       if (agent.legDistance >= total - 0.01) this.nextLeg(agent)
       return
     }
@@ -414,6 +563,7 @@ export class OfficeEngine {
         agent.visible = true
         agent.position = { ...run.to }
         agent.island = leg.to
+        agent.heading = 'toward'
         this.emit({ type: 'teleport', key: agent.key, from: leg.from, to: leg.to, phase: 'out' })
       }
     } else if (run.phase === 'out' && elapsed >= TELEPORT_IN) {
@@ -435,34 +585,49 @@ export class OfficeEngine {
       let animation: AgentAnimationName = ACTIVITY_PRESENTATION[agent.activity].animation
       let reverse = false
       const leg = agent.route[agent.legIndex]
+      const ambient = agent.ambient && this.ambientApplies(agent) ? agent.ambient : null
       if (agent.teleport) {
         animation = 'teleport'
         reverse = agent.teleport.phase === 'out'
       } else if (leg?.kind === 'walk') animation = 'walk'
-      const animationKey = agent.teleport ? `teleport:${agent.teleport.phase}` : animation
+      else if (ambient) animation = ambient.animation
+      const animationKey = agent.teleport
+        ? `teleport:${agent.teleport.phase}`
+        : ambient
+          ? `ambient:${ambient.id}:${animation}`
+          : animation
       if (animationKey !== agent.lastAnimation) {
         agent.lastAnimation = animationKey
         agent.animationStarted = agent.teleport ? agent.teleport.started : this.time
       }
       const definition = AGENT_ANIMATIONS[animation]
-      const elapsed = this.time - agent.animationStarted
-      let frame = Math.floor(elapsed * definition.fps)
+      let frame: number
+      if (animation === 'walk' && !agent.teleport) {
+        // Langkah mengikuti jarak tempuh, bukan jam: tidak ada kaki yang meluncur.
+        frame = Math.floor((agent.walked / STRIDE_UNITS) * definition.frames) % definition.frames
+      } else {
+        const offset = definition.loop && !ambient ? agent.phaseOffset : 0
+        frame = Math.floor((this.time - agent.animationStarted + offset) * definition.fps)
+        if (definition.loop) frame %= definition.frames
+        else frame = Math.min(definition.frames - 1, frame)
+      }
       // Reduced motion: semua animasi (termasuk lompatan celebrate & guncangan error) diam di frame 0;
       // perubahan state tetap terjadi.
       if (this.reducedMotion) frame = 0
-      else if (definition.loop) frame %= definition.frames
-      else frame = Math.min(definition.frames - 1, frame)
       if (reverse) frame = definition.frames - 1 - frame
       states.push({
         key: agent.key,
         x: agent.position.x,
         y: agent.position.y,
-        facing: animation === 'walk' ? agent.facing : 1,
+        facing: animation === 'walk' ? agent.facing : (ambient?.facing ?? 1),
+        heading: agent.heading,
         animation,
         frame,
         visible: agent.visible,
         depth: 100 + Math.round(agent.position.y),
         orb: agent.orb,
+        ambient: ambient?.id ?? null,
+        acknowledging: agent.queued !== null,
       })
     }
     return states

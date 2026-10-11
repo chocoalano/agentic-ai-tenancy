@@ -26,7 +26,7 @@ export const ISLAND_ART_GEOMETRY: Record<IslandKey, IslandArtGeometry> = {
     spawnPoint: { x: 0.5, y: 0.54 },
     workstationSlots: [
       { id: 'slot-0', x: 0.64, y: 0.5 },
-      { id: 'slot-1', x: 0.36, y: 0.5 },
+      { id: 'slot-1', x: 0.42, y: 0.53 },
     ],
     portalEntry: { x: 0.31, y: 0.49 },
     portalExit: { x: 0.31, y: 0.49 },

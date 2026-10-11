@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CircleCheck, Hourglass, TriangleAlert } from '@lucide/vue'
+import { CircleCheck, Hourglass, TriangleAlert, Zap } from '@lucide/vue'
 import { OFFICE_ENGINE_BRIDGE, type OfficeAgentView } from '~/composables/useOfficeEngine'
 import { ACTIVITY_PRESENTATION } from '~/game/agent-state'
 import {
@@ -85,7 +85,15 @@ const DOT: Record<string, string> = {
     :data-actor="agent.key"
     :data-preview="agent.preview ? 'true' : undefined"
     :data-activity="agent.activity"
+    :data-selected="selected ? 'true' : undefined"
   >
+    <!-- Bayangan kontak di tanah (robot menapak, bukan melayang) -->
+    <span
+      class="absolute block -translate-x-1/2 -translate-y-1/2 rounded-[50%] bg-[radial-gradient(ellipse_at_center,oklch(0.08_0.04_270/55%),oklch(0.08_0.04_270/25%)_55%,transparent_75%)]"
+      :style="{ width: 'calc(var(--s) * 74)', height: 'calc(var(--s) * 24)', left: 0, top: 'calc(var(--s) * 3)' }"
+      data-actor-shadow
+      aria-hidden="true"
+    />
     <!-- Cincin energi di kaki -->
     <span
       v-if="glowing"
@@ -95,6 +103,35 @@ const DOT: Record<string, string> = {
     >
       <GameImage :asset="FX['energy-ring']" />
     </span>
+    <!-- Sorotan pilihan -->
+    <span
+      v-if="selected"
+      class="absolute block -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-office-cyan shadow-[0_0_18px_var(--office-cyan)] motion-safe:animate-office-pulse"
+      :style="{ width: 'calc(var(--s) * 104)', height: 'calc(var(--s) * 42)', left: 0, top: 0 }"
+      data-actor-selection
+      aria-hidden="true"
+    />
+    <!-- Penerimaan perintah: cincin meluas + lencana -->
+    <template v-if="agent.acknowledging">
+      <span
+        class="absolute left-0 top-0 block rounded-[50%] border-2 border-office-orange opacity-0 shadow-[0_0_16px_var(--office-orange)] motion-safe:animate-office-ack"
+        :style="{ width: 'calc(var(--s) * 110)', height: 'calc(var(--s) * 44)' }"
+        data-actor-ack
+        aria-hidden="true"
+      />
+      <span
+        class="absolute grid -translate-x-1/2 place-items-center rounded-full border border-office-orange bg-office-orange/25 text-office-orange shadow-lg motion-safe:animate-office-pulse"
+        :style="{
+          width: 'calc(var(--s) * 26)',
+          height: 'calc(var(--s) * 26)',
+          left: 'calc(var(--s) * 34)',
+          top: 'calc(var(--s) * -128)',
+        }"
+        aria-hidden="true"
+      >
+        <Zap class="size-[60%]" />
+      </span>
+    </template>
 
     <Tooltip>
       <TooltipTrigger as-child>
@@ -191,7 +228,7 @@ const DOT: Record<string, string> = {
         ]"
       />
       {{ agent.name }}
-      <span class="font-normal text-office-cyan/90">{{ presentation.label }}</span>
+      <span class="font-normal text-office-cyan/90">{{ agent.workstationActivity ?? agent.label }}</span>
     </span>
 
     <!-- Gelembung ucapan (skrip simulasi / visual) -->

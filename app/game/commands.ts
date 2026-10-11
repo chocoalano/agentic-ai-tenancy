@@ -1,5 +1,6 @@
 import type { CharacterKey } from '../utils/game-assets'
 import type { ActivityState } from './agent-state'
+import { STATION_DEFAULT_ACTIVITY } from './workstations'
 import type { IslandId } from './world'
 
 /*
@@ -72,6 +73,23 @@ export const AGENT_COMMANDS: readonly CommandDefinition[] = [
     live: { supported: false, reason: 'API mengubah status agent belum tersedia (Phase 1 read-only).' },
     preview: true,
   },
+  {
+    key: 'run_atlas',
+    label: 'Jalankan Project Atlas',
+    kind: 'business',
+    live: {
+      supported: false,
+      reason: 'Skenario misi hanya simulasi pratinjau; eksekusi nyata butuh Agent Orchestrator.',
+    },
+    preview: true,
+  },
+  {
+    key: 'reset_simulation',
+    label: 'Reset simulasi',
+    kind: 'business',
+    live: { supported: false, reason: 'Tidak ada simulasi di mode live; posisi robot mengikuti data backend.' },
+    preview: true,
+  },
 ]
 
 export type InstructionIntent =
@@ -136,16 +154,8 @@ export function parsePreviewInstruction(text: string, selected: CharacterKey | n
   }
 }
 
-/** Aktivitas yang dijalankan robot saat tiba di workstation (simulasi pratinjau). */
-export const STATION_ACTIVITY: Record<IslandId, ActivityState> = {
-  'mission-hub': 'communicating',
-  'web-research': 'researching',
-  'data-warehouse': 'using_tool',
-  'client-brief': 'communicating',
-  'knowledge-base': 'reading',
-  'analytics-tool': 'working',
-  'report-builder': 'working',
-  'task-manager': 'working',
-  'training-center': 'thinking',
-  'research-lab': 'thinking',
-}
+/**
+ * Aktivitas yang dijalankan robot saat tiba di workstation (simulasi pratinjau) =
+ * aktivitas default stasiun dari sistem workstation (`app/game/workstations.ts`).
+ */
+export const STATION_ACTIVITY: Record<IslandId, ActivityState> = STATION_DEFAULT_ACTIVITY

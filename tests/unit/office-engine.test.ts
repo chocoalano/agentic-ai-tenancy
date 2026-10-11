@@ -4,7 +4,15 @@ import { join } from 'node:path'
 import { ACTIVITY_STATES, canTransition, liveActivity } from '../../app/game/agent-state'
 import { AGENT_ANIMATIONS, AGENT_SHEET, ANIMATION_ROWS } from '../../app/game/animation-spec'
 import { AGENT_COMMANDS, parsePreviewInstruction } from '../../app/game/commands'
-import { OfficeEngine, type AgentSpec } from '../../app/game/engine'
+import {
+  OfficeEngine,
+  STRIDE_UNITS,
+  headingOf,
+  phaseOffsetFor,
+  type AgentSpec,
+  type EngineEvent,
+  type Heading,
+} from '../../app/game/engine'
 import { liveAgentSpecs, mapRealtimeEvent } from '../../app/game/live-adapter'
 import { findRoute, islandPath } from '../../app/game/navigation'
 import { ATLAS_PHASES, ATLAS_START, SimulationController, atlasAgentSpecs } from '../../app/game/simulation'
@@ -565,5 +573,155 @@ describe('sprite sheet karakter', () => {
         expect(atlas.animations[name].fps).toBe(AGENT_ANIMATIONS[name].fps)
       }
     }
+  })
+})
+
+describe('penerimaan perintah, langkah berbasis jarak, arah hadap, offset fase', () => {
+  test('perintah dengan jeda penerimaan: siaga → menerima (thinking) → berangkat → tiba dengan rencana', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents([spec('sage', 'mission-hub')])
+    const events: EngineEvent[] = []
+    engine.on((event) => events.push(event))
+    expect(
+      engine.moveTo('sage', { island: 'web-research' }, { state: 'researching' }, { acknowledgeSeconds: 0.7 }),
+    ).toBe(true)
+    const agent = engine.agents.get('sage')
+    if (!agent) throw new Error('agent hilang')
+    expect(agent.activity).toBe('thinking')
+    expect(agent.route).toEqual([])
+    expect(agent.destination?.island).toBe('web-research')
+    expect(engine.renderStates()[0]?.acknowledging).toBe(true)
+    expect(events.map((event) => event.type)).toEqual(['activity', 'acknowledge'])
+    run(engine, 0.5)
+    expect(agent.route).toEqual([])
+    run(engine, 0.3)
+    expect(agent.activity).toBe('moving')
+    expect(agent.route.length).toBeGreaterThan(0)
+    expect(events.some((event) => event.type === 'route')).toBe(true)
+    expect(engine.renderStates()[0]?.acknowledging).toBe(false)
+    run(engine, 25)
+    expect(agent.island).toBe('web-research')
+    expect(agent.activity).toBe('researching')
+  })
+
+  test('pembatalan atau aktivitas baru saat menerima perintah membuang perintah itu (tidak pernah berangkat)', () => {
+    const engine = new OfficeEngine(world)
+    engine.setAgents([spec('a', 'mission-hub'), spec('b', 'mission-hub')])
+    engine.moveTo('a', { island: 'web-research' }, { state: 'researching' }, { acknowledgeSeconds: 0.7 })
+    engine.cancel('a')
+    const a = engine.agents.get('a')
+    expect(a?.activity).toBe('idle')
+    expect(a?.destination).toBeNull()
+    engine.moveTo('b', { island: 'web-research' }, { state: 'researching' }, { acknowledgeSeconds: 0.7 })
+    expect(engine.setActivity('b', { state: 'working' })).toBe(true)
+    run(engine, 3)
+    expect(a?.island).toBe('mission-hub')
+    expect(a?.route).toEqual([])
+    const b = engine.agents.get('b')
+    expect(b?.island).toBe('mission-hub')
+    expect(b?.activity).toBe('working')
+    expect(b?.route).toEqual([])
+  })
+
+  test('tanpa jeda penerimaan: reduced motion tiba seketika; robot yang sudah bergerak langsung dialihkan', () => {
+    const reduced = new OfficeEngine(world, { reducedMotion: true })
+    reduced.setAgents([spec('sage', 'mission-hub')])
+    reduced.moveTo('sage', { island: 'web-research' }, { state: 'researching' }, { acknowledgeSeconds: 0.7 })
+    expect(reduced.agents.get('sage')?.island).toBe('web-research')
+    expect(reduced.agents.get('sage')?.activity).toBe('researching')
+
+    const engine = new OfficeEngine(world)
+    engine.setAgents([spec('sage', 'mission-hub')])
+    engine.moveTo('sage', { island: 'web-research' })
+    run(engine, 0.5)
+    engine.moveTo('sage', { island: 'client-brief' }, { state: 'communicating' }, { acknowledgeSeconds: 0.7 })
+    const agent = engine.agents.get('sage')
+    expect(agent?.activity).toBe('moving')
+    expect(agent?.destination?.island).toBe('client-brief')
+    expect(engine.renderStates()[0]?.acknowledging).toBe(false)
+  })
+
+  test('frame jalan mengikuti jarak tempuh, bukan jam: sama pada kecepatan 1× dan 2×; jeda membekukan frame', () => {
+    for (const speed of [1, 2]) {
+      const engine = new OfficeEngine(world)
+      engine.speed = speed
+      engine.setAgents([spec('sage', 'knowledge-base')])
+      engine.moveTo('sage', { island: 'report-builder' })
+      const agent = engine.agents.get('sage')
+      if (!agent) throw new Error('agent hilang')
+      const frames = new Set<number>()
+      for (let frame = 0; frame < 60 * 20 && agent.route.length > 0; frame += 1) {
+        engine.tick(1 / 60)
+        const [state] = engine.renderStates()
+        if (state?.animation !== 'walk') continue
+        const expected =
+          Math.floor((agent.walked / STRIDE_UNITS) * AGENT_ANIMATIONS.walk.frames) % AGENT_ANIMATIONS.walk.frames
+        expect(state.frame).toBe(expected)
+        frames.add(state.frame)
+      }
+      expect(frames.size).toBe(AGENT_ANIMATIONS.walk.frames)
+    }
+    const engine = new OfficeEngine(world)
+    engine.setAgents([spec('sage', 'knowledge-base')])
+    engine.moveTo('sage', { island: 'report-builder' })
+    run(engine, 0.4)
+    const before = engine.renderStates()[0]?.frame
+    engine.paused = true
+    run(engine, 1)
+    expect(engine.renderStates()[0]?.frame).toBe(before)
+  })
+
+  test('arah hadap isometrik dari vektor gerak (kiri/kanan/menghadap/membelakangi) dan reset saat keluar portal', () => {
+    expect(headingOf(10, 0, 'toward')).toBe('right')
+    expect(headingOf(-10, 1, 'toward')).toBe('left')
+    expect(headingOf(1, 10, 'right')).toBe('toward')
+    expect(headingOf(1, -10, 'right')).toBe('away')
+    expect(headingOf(10, 6, 'away')).toBe('right')
+    expect(headingOf(0.1, 0.1, 'left')).toBe('left')
+
+    const engine = new OfficeEngine(world)
+    engine.setAgents([spec('sage', 'knowledge-base')])
+    engine.moveTo('sage', { island: 'data-warehouse' })
+    const agent = engine.agents.get('sage')
+    if (!agent) throw new Error('agent hilang')
+    const seen = new Set<Heading>()
+    const exit: { heading: Heading | null } = { heading: null }
+    engine.on((event) => {
+      if (event.type === 'teleport' && event.phase === 'out') exit.heading = agent.heading
+    })
+    for (let frame = 0; frame < 60 * 30 && agent.route.length > 0; frame += 1) {
+      engine.tick(1 / 60)
+      const [state] = engine.renderStates()
+      if (state) {
+        expect(state.heading).toBe(agent.heading)
+        if (state.animation === 'walk') seen.add(state.heading)
+        // Cermin horizontal hanya mengikuti komponen x gerak.
+        if (state.animation === 'walk' && state.heading === 'left') expect(state.facing).toBe(-1)
+        if (state.animation === 'walk' && state.heading === 'right') expect(state.facing).toBe(1)
+      }
+    }
+    expect(seen.size).toBeGreaterThan(0)
+    for (const heading of seen) expect(['left', 'right', 'toward', 'away']).toContain(heading)
+    expect(exit.heading).toBe('toward')
+  })
+
+  test('offset fase deterministik per agent: animasi siaga kelima robot tidak serempak', () => {
+    expect(phaseOffsetFor('preview:nova')).toBe(phaseOffsetFor('preview:nova'))
+    const offsets = atlasAgentSpecs(NAMES).map((item) => phaseOffsetFor(item.key))
+    for (const offset of offsets) {
+      expect(offset).toBeGreaterThanOrEqual(0)
+      expect(offset).toBeLessThan(1.5)
+    }
+    expect(new Set(offsets.map((offset) => Math.round(offset * 100))).size).toBeGreaterThanOrEqual(3)
+    const engine = new OfficeEngine(world)
+    engine.setAgents(atlasAgentSpecs(NAMES))
+    run(engine, 0.05)
+    const frames = engine.renderStates().map((state) => state.frame)
+    expect(new Set(frames).size).toBeGreaterThan(1)
+    // Reduced motion: offset tidak membuat frame bergeser dari 0.
+    const still = new OfficeEngine(world, { reducedMotion: true })
+    still.setAgents(atlasAgentSpecs(NAMES))
+    run(still, 0.05)
+    for (const state of still.renderStates()) expect(state.frame).toBe(0)
   })
 })

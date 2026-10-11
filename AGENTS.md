@@ -37,8 +37,10 @@ bun run build && bun run test:e2e
     `/game-assets(-v2)/...` di komponen atau menggambar ulang aset dengan CSS. Lihat `docs/game-asset-quality-report.md`.
 12. Mesin game `app/game/` (TS murni): satu loop rAF, renderer menulis DOM langsung, tanpa reaktivitas Vue per frame.
     Simulasi pratinjau berlabel SIMULASI, tanpa API tulis, bukan jalur eksekusi live; mode live hanya memetakan event
-    SSE yang ada. Lihat `docs/character-animation-system.md`, `docs/office-simulation.md`,
-    `docs/live-agent-event-mapping.md`.
+    SSE yang ada. Efek workstation diturunkan dari state agent (`workstations.ts`), ambient hanya overlay render
+    (`ambient.ts`, prioritas perintah > misi > workstation > ambient). Frame robot masih prosedural (BLOCKED) — jangan
+    menyebutnya artwork artist. Lihat `docs/character-animation-system.md`, `docs/office-simulation.md`,
+    `docs/workstation-interactions.md`, `docs/office-ambient-behavior.md`, `docs/live-agent-event-mapping.md`.
 13. Halaman harness khusus pengembangan di `app/dev/*.vue` (didaftarkan modul inline `devOnlyPages` hanya saat
     `nuxt dev`), bukan di `app/pages/`; build production harus 404.
 14. Backend fail-closed: request tenant tidak dilayani sebelum gerbang kesiapan (`api/core/database/readiness.ts`)

@@ -16,6 +16,8 @@ const props = defineProps<{
   active?: boolean
   /** Tujuan robot yang sedang bergerak (sorotan). */
   targeted?: boolean
+  /** Hologram pulau menyala sebentar secara ambient (pratinjau, tanpa robot). */
+  ambient?: boolean
   index: number
 }>()
 
@@ -60,6 +62,9 @@ const accessibleLabel = computed(
           definition.depth === 'far' && !selected && !active ? 'brightness-90 saturate-90' : '',
           active
             ? 'brightness-110 saturate-125 drop-shadow-[0_0_20px_color-mix(in_oklch,var(--office-mint)_70%,transparent)]'
+            : '',
+          ambient && !active && !selected
+            ? 'brightness-105 drop-shadow-[0_0_18px_color-mix(in_oklch,var(--office-cyan)_55%,transparent)]'
             : '',
           state === 'empty' && !selected ? 'saturate-[0.85]' : '',
         ]"

@@ -73,7 +73,8 @@ export const ACTIVITY_PRESENTATION: Record<ActivityState, ActivityPresentation> 
   researching: { animation: 'read', label: 'Meriset', effect: 'particles', workstationActive: true },
   reading: { animation: 'read', label: 'Membaca', effect: 'none', workstationActive: true },
   using_tool: { animation: 'work', label: 'Memakai alat', effect: 'hologram', workstationActive: true },
-  communicating: { animation: 'communicate', label: 'Berkomunikasi', effect: 'none', workstationActive: false },
+  // Berkomunikasi di stasiun (brief klien, koordinasi di Mission Hub) menyalakan workstation-nya.
+  communicating: { animation: 'communicate', label: 'Berkomunikasi', effect: 'none', workstationActive: true },
   waiting_approval: { animation: 'think', label: 'Menunggu persetujuan', effect: 'approval', workstationActive: true },
   completed: { animation: 'celebrate', label: 'Selesai', effect: 'success', workstationActive: false },
   failed: { animation: 'error', label: 'Gagal', effect: 'alert', workstationActive: false },
