@@ -8,8 +8,8 @@ useHead({ title: 'AI Employees' })
 const { $api } = useNuxtApp()
 const auth = useAuth()
 
-const { data, status, error, refresh } = await useTenantAsyncData('agents', async (_tenantId, signal) => {
-  const { data, error } = await $api.v1.agents.get({ fetch: { signal } })
+const { data, status, error, refresh } = await useTenantAsyncData('agents', async (_tenantId, _signal, request) => {
+  const { data, error } = await $api.v1.agents.get(request)
   if (error) throw apiFailure(error)
   return data.items
 })

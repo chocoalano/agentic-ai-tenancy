@@ -23,3 +23,5 @@ export type ApiErrorBody = typeof ApiErrorSchema.static
 export const validationErrors = { 422: ApiErrorSchema }
 /** Route terlindungi: 401 bila sesi tidak valid, 403 bila izin/keanggotaan/CSRF ditolak. */
 export const protectedErrors = { 401: ApiErrorSchema, 403: ApiErrorSchema }
+/** Route tenant-scoped: + 409 TENANT_MISMATCH bila header x-active-tenant tab tidak cocok dengan sesi. */
+export const tenantErrors = { ...protectedErrors, 409: ApiErrorSchema }

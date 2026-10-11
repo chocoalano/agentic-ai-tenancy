@@ -1,5 +1,6 @@
 import { Elysia, type Cookie } from 'elysia'
 import type { PermissionKey } from '../../../domains/auth/permissions'
+import { ACTIVE_TENANT_HEADER, TENANT_ID_HEADER, TENANT_MISMATCH_CODE } from '../../../domains/tenancy/headers'
 import { hasPermission } from '../../../domains/tenancy/types'
 import type { ActiveSession } from '../../modules/auth/session.repository'
 import type { AuthService } from '../../modules/auth/service'
@@ -29,6 +30,25 @@ async function authenticate(deps: GuardDeps, cookie: Record<string, Cookie<unkno
 }
 
 /**
+ * Header opsional dari klien yang menyatakan tenant yang DIKIRA aktif oleh tab
+ * tersebut. Bukan sumber identitas (identitas tetap dari cookie); hanya
+ * pemeriksaan konsistensi: bila berbeda dari tenant aktif di sesi server
+ * (mis. tab lain sudah berganti tenant), request ditolak 409 sehingga data
+ * tenant lain tidak pernah masuk ke cache tab yang usang.
+ */
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function assertClientTenantMatches(request: Request, activeTenantId: string) {
+  const claimed = request.headers.get(ACTIVE_TENANT_HEADER)
+  if (claimed === null || claimed === '') return
+  if (!UUID_PATTERN.test(claimed) || claimed.toLowerCase() !== activeTenantId.toLowerCase()) {
+    throw new AppError(409, TENANT_MISMATCH_CODE, 'Perusahaan aktif telah berubah. Muat ulang halaman.', {
+      activeTenantId,
+    })
+  }
+}
+
+/**
  * Macro otorisasi untuk route:
  *
  *   { auth: true }               → butuh sesi valid; menyediakan `session`
@@ -47,11 +67,12 @@ export function guardPlugin(deps: GuardDeps) {
       },
     },
     tenant: (permission: PermissionKey) => ({
-      async resolve({ cookie, request }) {
+      async resolve({ cookie, request, set }) {
         const session = await authenticate(deps, cookie)
         if (!session.activeTenantId) {
           throw new AppError(403, 'TENANT_NOT_SELECTED', 'Pilih perusahaan terlebih dahulu.')
         }
+        assertClientTenantMatches(request, session.activeTenantId)
         const tenant = await deps.auth.activeTenantFor(session, requestIdOf(request))
         if (!tenant) {
           throw new AppError(403, 'TENANT_ACCESS_DENIED', 'Anda tidak lagi memiliki akses ke perusahaan ini.')
@@ -61,6 +82,7 @@ export function guardPlugin(deps: GuardDeps) {
             required: permission,
           })
         }
+        set.headers[TENANT_ID_HEADER] = tenant.tenantId
         return { session, tenant }
       },
     }),

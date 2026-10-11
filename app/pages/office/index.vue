@@ -18,15 +18,18 @@ const auth = useAuth()
  * aplikasi Elysia in-process dengan cookie pengguna; di browser, request yang
  * sama dikirim ke /api/v1/*. Kunci cache memuat ID tenant.
  */
-const { data, status, error, refresh } = await useTenantAsyncData('office-overview', async (tenantId, signal) => {
-  const [tenant, agents] = await Promise.all([
-    $api.v1.tenants({ id: tenantId }).get({ fetch: { signal } }),
-    $api.v1.agents.get({ fetch: { signal } }),
-  ])
-  if (tenant.error) throw apiFailure(tenant.error)
-  if (agents.error) throw apiFailure(agents.error)
-  return { tenant: tenant.data, agents: agents.data.items }
-})
+const { data, status, error, refresh } = await useTenantAsyncData(
+  'office-overview',
+  async (tenantId, _signal, request) => {
+    const [tenant, agents] = await Promise.all([
+      $api.v1.tenants({ id: tenantId }).get(request),
+      $api.v1.agents.get(request),
+    ])
+    if (tenant.error) throw apiFailure(tenant.error)
+    if (agents.error) throw apiFailure(agents.error)
+    return { tenant: tenant.data, agents: agents.data.items }
+  },
+)
 </script>
 
 <template>

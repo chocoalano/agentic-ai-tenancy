@@ -25,11 +25,27 @@ function onTabChange(value: string | number) {
   if (next) tab.value = next
 }
 
-const { data: tenant, error: tenantError } = await useTenantAsyncData('settings-tenant', async (tenantId, signal) => {
-  const { data, error } = await $api.v1.tenants({ id: tenantId }).get({ fetch: { signal } })
-  if (error) throw apiFailure(error)
-  return data
-})
+const { data: tenant, error: tenantError } = await useTenantAsyncData(
+  'settings-tenant',
+  async (tenantId, _signal, request) => {
+    const { data, error } = await $api.v1.tenants({ id: tenantId }).get(request)
+    if (error) throw apiFailure(error)
+    return data
+  },
+)
+
+const loggingOut = ref(false)
+async function logout() {
+  loggingOut.value = true
+  try {
+    const failure = await auth.logout()
+    if (failure) {
+      toast.error('Gagal keluar', { description: `${failure.message} Sesi Anda masih aktif — coba lagi.` })
+    }
+  } finally {
+    loggingOut.value = false
+  }
+}
 
 const createOpen = ref(false)
 const companyForm = useForm({
@@ -248,7 +264,7 @@ const agentTokens = [
             <p class="text-muted-foreground">Keluar akan mencabut sesi ini di database.</p>
           </CardContent>
           <CardFooter>
-            <Button variant="destructive" @click="auth.logout()"
+            <Button variant="destructive" :disabled="loggingOut" @click="logout"
               ><LogOut class="size-4" aria-hidden="true" />Keluar</Button
             >
           </CardFooter>

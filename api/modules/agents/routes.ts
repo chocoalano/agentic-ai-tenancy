@@ -2,7 +2,7 @@ import { Elysia, t } from 'elysia'
 import { AGENT_LIFECYCLE_STATUSES } from '../../../domains/agents/types'
 import { guardPlugin } from '../../core/auth/guard'
 import type { ApiConfig } from '../../core/config/env'
-import { ApiErrorSchema, protectedErrors, validationErrors } from '../../core/errors/schemas'
+import { ApiErrorSchema, tenantErrors, validationErrors } from '../../core/errors/schemas'
 import { IdParams, Timestamp, Uuid } from '../../shared/schemas'
 import type { AuthService } from '../auth/service'
 import type { AgentService } from './service'
@@ -43,7 +43,7 @@ export function agentRoutes(deps: { config: ApiConfig; auth: AuthService; agents
       },
       {
         tenant: 'agents.read',
-        response: { 200: t.Object({ items: t.Array(AgentSummarySchema) }), ...protectedErrors },
+        response: { 200: t.Object({ items: t.Array(AgentSummarySchema) }), ...tenantErrors },
         detail: {
           summary: 'Daftar AI employee',
           description: 'AI employee milik tenant aktif. Butuh izin `agents.read`. Data diisolasi oleh RLS.',
@@ -57,7 +57,7 @@ export function agentRoutes(deps: { config: ApiConfig; auth: AuthService; agents
       {
         tenant: 'agents.read',
         params: IdParams,
-        response: { 200: AgentDetailSchema, ...protectedErrors, 404: ApiErrorSchema, ...validationErrors },
+        response: { 200: AgentDetailSchema, ...tenantErrors, 404: ApiErrorSchema, ...validationErrors },
         detail: {
           summary: 'Detail AI employee',
           description: 'Mengembalikan 404 bila agent tidak ada di tenant aktif (termasuk agent milik tenant lain).',

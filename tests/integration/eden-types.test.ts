@@ -36,7 +36,7 @@ describe('inferensi tipe Eden', () => {
 
   test('error bertipe per status HTTP', () => {
     type AgentError = ErrorOf<ReturnType<Client['v1']['agents']>['get']>
-    expectTypeOf<AgentError['status']>().toEqualTypeOf<401 | 403 | 404 | 422>()
+    expectTypeOf<AgentError['status']>().toEqualTypeOf<401 | 403 | 404 | 409 | 422>()
     expectTypeOf<Extract<AgentError, { status: 404 }>['value']['code']>().toEqualTypeOf<string>()
   })
 })

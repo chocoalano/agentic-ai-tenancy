@@ -18,8 +18,12 @@ const activeRoles = computed(() => auth.activeTenant.value?.roles.join(', ') ?? 
 async function select(tenantId: string) {
   if (tenantId === auth.activeTenantId.value || switching.value) return
   switching.value = tenantId
-  const failure = await auth.switchTenant(tenantId)
-  switching.value = null
+  let failure: Awaited<ReturnType<typeof auth.switchTenant>>
+  try {
+    failure = await auth.switchTenant(tenantId)
+  } finally {
+    switching.value = null
+  }
   if (failure) {
     toast.error('Gagal mengganti perusahaan', { description: failure.message })
     return

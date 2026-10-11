@@ -36,6 +36,13 @@ export function toApiErrorInfo(error: { status: unknown; value: unknown }): ApiE
   return { status, code: 'NETWORK_ERROR', message: 'Tidak dapat terhubung ke server. Periksa koneksi Anda.' }
 }
 
+/** Kode ApiError dari error yang dibuat `apiFailure` (atau null bila bukan). */
+export function apiErrorCodeOf(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('data' in error)) return null
+  const data = error.data
+  return typeof data === 'object' && data !== null && 'code' in data && typeof data.code === 'string' ? data.code : null
+}
+
 /** Membuat NuxtError dari error API agar dapat dilempar di dalam useAsyncData. */
 export function apiFailure(error: { status: unknown; value: unknown }) {
   const info = toApiErrorInfo(error)

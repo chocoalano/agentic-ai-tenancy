@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Laptop, LogOut, Moon, Settings, Sun, UserRound } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 
 const auth = useAuth()
 const colorMode = useColorMode()
@@ -21,7 +22,10 @@ function onThemeChange(value: unknown) {
 async function logout() {
   loggingOut.value = true
   try {
-    await auth.logout()
+    const failure = await auth.logout()
+    if (failure) {
+      toast.error('Gagal keluar', { description: `${failure.message} Sesi Anda masih aktif — coba lagi.` })
+    }
   } finally {
     loggingOut.value = false
   }

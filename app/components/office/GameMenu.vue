@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Images, Lock, LogOut } from '@lucide/vue'
+import { toast } from 'vue-sonner'
 
 /**
  * Menu game (Sheet) — pengganti sidebar aplikasi di layout game: pemilih
@@ -23,7 +24,10 @@ watch(
 async function logout() {
   loggingOut.value = true
   try {
-    await auth.logout()
+    const failure = await auth.logout()
+    if (failure) {
+      toast.error('Gagal keluar', { description: `${failure.message} Sesi Anda masih aktif — coba lagi.` })
+    }
   } finally {
     loggingOut.value = false
   }

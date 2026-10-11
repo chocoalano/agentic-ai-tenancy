@@ -13,8 +13,8 @@ const {
   status,
   error,
   refresh,
-} = await useTenantAsyncData(`agent:${agentId.value}`, async (_tenantId, signal) => {
-  const { data, error } = await $api.v1.agents({ id: agentId.value }).get({ fetch: { signal } })
+} = await useTenantAsyncData(`agent:${agentId.value}`, async (_tenantId, _signal, request) => {
+  const { data, error } = await $api.v1.agents({ id: agentId.value }).get(request)
   if (error) throw apiFailure(error)
   return data
 })
