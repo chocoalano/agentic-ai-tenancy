@@ -13,6 +13,8 @@
  *     terlihat × faktor `v2`.
  *  8. Sprite sheet animasi per karakter (agents/{karakter}/sheet.webp +
  *     atlas.json) mengikuti kontrak app/game/animation-spec.ts.
+ *  9. Tidak ada aset yatim di public/game-assets-v2: setiap berkas runtime
+ *     dirujuk registry (master PNG/turunan tak terpakai tidak ikut deploy).
  *
  * Keluar dengan kode 1 bila ada pemeriksaan yang gagal.
  */
@@ -437,6 +439,31 @@ check(
   sheetProblems.length === 0,
   `${CHARACTER_KEYS.length} sprite sheet animasi (${ANIMATION_ROWS.length} animasi) mengikuti kontrak animation-spec`,
   sheetProblems.join('; '),
+)
+
+// 9. Aset yatim di public/game-assets-v2 ---------------------------------------
+// Semua berkas runtime harus dirujuk registry (varian artwork, sheet+atlas robot, latar);
+// berkas sumber/master (PNG hasil generate, turunan yang tidak dipakai) tidak boleh ikut terkirim.
+const referenced = new Set<string>()
+for (const item of registered) {
+  const v2 = v2Source(item)
+  if (v2) referenced.add(publicFile(v2.src))
+}
+for (const character of CHARACTER_KEYS) {
+  const source = agentSheetSource(character)
+  referenced.add(publicFile(source.src))
+  referenced.add(publicFile(source.atlas))
+}
+referenced.add(publicFile(MISSION_CITY_BACKGROUND.src))
+const v2Root = join(PUBLIC_DIR, 'game-assets-v2')
+const orphans = [...new Bun.Glob('**/*').scanSync({ cwd: v2Root, onlyFiles: true })]
+  .map((file) => join(v2Root, file))
+  .filter((file) => !referenced.has(file))
+  .map((file) => relative(PUBLIC_DIR, file))
+check(
+  orphans.length === 0,
+  `Tidak ada aset yatim di public/game-assets-v2 (${referenced.size} berkas runtime dirujuk registry)`,
+  orphans.join(', '),
 )
 
 // Laporan -----------------------------------------------------------------

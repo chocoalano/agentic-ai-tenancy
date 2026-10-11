@@ -39,7 +39,7 @@ const uiPreviews = Object.entries(UI_PREVIEWS)
     <PageHeader
       eyebrow="Pratinjau desain"
       title="Galeri Aset Game"
-      description="Aset dari asset pack Neon Mission Map yang dipakai Virtual Office (varian HD turunan ditampilkan bila tersedia). Halaman ini bukan data perusahaan."
+      description="Aset Virtual Office: asset pack Neon Mission Map (varian perbaikan v2) dan artwork pulau/latar rekonstruksi (v3, hasil generate AI). Halaman ini bukan data perusahaan."
     >
       <template #actions>
         <Badge variant="outline" class="gap-1 border-dashed">

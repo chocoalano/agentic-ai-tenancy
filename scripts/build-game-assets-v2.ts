@@ -202,6 +202,9 @@ function repairedSource(item: GameAsset, options: { mirror?: boolean } = {}): Ra
 }
 
 function buildStatic(item: GameAsset): string | null {
+  // Pulau dengan artwork rekonstruksi (`variant`) dirender dari berkas itu; turunan prosedural
+  // tidak dibutuhkan dan tidak boleh ikut terkirim ke production (lihat check:assets, aset yatim).
+  if (item.variant) return null
   const target = v2Source(item, false)
   if (!target) return null
   const source = repairedSource(item)

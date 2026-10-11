@@ -6,7 +6,7 @@ Knowledge Base, Analytics Tool, Report Builder, dan Final Report. PNG hasil gene
 disimpan terpisah di `public/game-assets-v2/` dengan akhiran `-v3`; semua PNG pack asli tetap utuh.
 
 Generasi memakai tool bawaan `image_gen`, dengan prompt lengkap di
-`design/office-reconstruction-prompts.json`. Gambar latar tidak memuat UI, karakter, pulau utama, atau jalur;
+`design/office-reconstruction/prompts.json`. Gambar latar tidak memuat UI, karakter, pulau utama, atau jalur;
 pulau memakai alpha transparan tanpa label/robot. Sembilan WebP berjumlah sekitar **2,2 MB**. Registry memilih
 varian rekonstruksi untuk render default, sedangkan `GameImage :v2="false"` tetap menampilkan sumber asli.
 Builder `assets:v2` secara eksplisit memilih tujuan prosedural sehingga tidak menimpa ilustrasi v3.
