@@ -16,6 +16,14 @@ Tanggal verifikasi: 11 Oktober 2026. Revisi ini menggantikan desain "dashboard +
 > `docs/live-agent-event-mapping.md` §5. Screenshot di `docs/screenshots/` telah diambil ulang dari build terbaru.
 > Tabel komponen → file aset di bawah masih menyebut path `hd/...@3x.png`; padanannya kini `/game-assets-v2/{id}.webp`.
 
+> **Pembaruan (stabilisasi, 11 Oktober 2026).** Pernyataan "semua artwork utama adalah aset asli asset pack" di atas
+> tidak lagi berlaku untuk pulau dan latar: delapan pulau utama dan latar kota memakai artwork **v3 yang dihasilkan
+> AI** (master PNG di `design/office-reconstruction/`, tidak di-deploy; lihat `docs/game-asset-quality-report.md`).
+> Robot, tile, efek, ikon, dan dua pulau dekoratif (Research Lab, Training Center) tetap dari pack asli. Geometri
+> jalan/slot/portal setiap pulau kini dikalibrasi dari artwork (`docs/office-navigation-system.md` §1), bukan fraksi
+> kotak. Folder `public/game-assets/hd` tidak ada lagi. Kriteria "≥ 7 struktur pulau terlihat" tetap terpenuhi (10
+> pulau dirender; 8 dapat dijalani).
+
 ## 1. Status gerbang penerimaan
 
 | Kriteria (brief §21)                         | Status | Bukti                                                                                   |

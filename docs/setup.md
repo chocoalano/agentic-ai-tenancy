@@ -39,21 +39,31 @@ Alternatif: `openssl rand -base64 48`.
 
 ### Variabel
 
-| Variabel                                               | Wajib | Keterangan                                                     |
-| ------------------------------------------------------ | ----- | -------------------------------------------------------------- |
-| `DATABASE_URL`                                         | ya    | Role **runtime** (`agentic_app`) — tunduk pada RLS             |
-| `DATABASE_MIGRATION_URL`                               | ya*   | Role **pemilik skema** (`agentic_owner`) — hanya untuk migrasi |
-| `DATABASE_ADMIN_URL`                                   | lokal | Superuser, hanya untuk `db:bootstrap`/`db:reset`               |
-| `TEST_DATABASE_URL`                                    | test  | Role runtime pada database test                                |
-| `TEST_DATABASE_MIGRATION_URL`                          | test  | Role pemilik pada database test                                |
-| `SESSION_SECRET`                                       | ya    | Kunci HMAC hash token sesi                                     |
-| `NUXT_PUBLIC_APP_NAME`                                 | tidak | Nama aplikasi (publik)                                         |
-| `SESSION_TTL_HOURS`                                    | tidak | Masa berlaku sesi absolut (default 168 jam)                    |
-| `APP_TRUSTED_ORIGINS`                                  | tidak | Origin tambahan untuk request mutasi                           |
-| `AUTH_LOGIN_MAX_FAILURES`, `AUTH_LOGIN_WINDOW_MINUTES` | tidak | Pembatasan login gagal (default 5 / 15 menit)                  |
-| `OPENAPI_ENABLED`                                      | tidak | Default `true`                                                 |
-| `REALTIME_HEARTBEAT_MS`                                | tidak | Interval heartbeat SSE (default 5000; harus < idle timeout)    |
-| `NITRO_BUN_IDLE_TIMEOUT`                               | tidak | Idle timeout `Bun.serve` produksi, detik (default Bun 10)      |
+| Variabel                                                                                 | Wajib | Keterangan                                                                                              |
+| ---------------------------------------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                                                           | ya    | Role **runtime** (`agentic_app`) — tunduk pada RLS                                                      |
+| `DATABASE_MIGRATION_URL`                                                                 | ya*   | Role **pemilik skema** (`agentic_owner`) — hanya untuk migrasi                                          |
+| `DATABASE_ADMIN_URL`                                                                     | lokal | Superuser, hanya untuk `db:bootstrap`/`db:reset`                                                        |
+| `TEST_DATABASE_URL`                                                                      | test  | Role runtime pada database test                                                                         |
+| `TEST_DATABASE_MIGRATION_URL`                                                            | test  | Role pemilik pada database test                                                                         |
+| `SESSION_SECRET`                                                                         | ya    | Kunci HMAC hash token sesi                                                                              |
+| `NUXT_PUBLIC_APP_NAME`                                                                   | tidak | Nama aplikasi (publik)                                                                                  |
+| `SESSION_TTL_HOURS`                                                                      | tidak | Masa berlaku sesi absolut (default 168 jam)                                                             |
+| `APP_TRUSTED_ORIGINS`                                                                    | tidak | Origin tambahan untuk request mutasi                                                                    |
+| `AUTH_LOGIN_MAX_FAILURES`, `AUTH_LOGIN_WINDOW_MINUTES`                                   | tidak | Percobaan masuk per email (default 5 / 15 menit; 1–100 / 1–1440)                                        |
+| `RATE_LIMIT_LOGIN_IP_MAX`, `..._WINDOW_MINUTES`                                          | tidak | Percobaan masuk per IP, apa pun emailnya (default 30 / 15)                                              |
+| `RATE_LIMIT_REGISTER_IP_MAX`, `..._WINDOW_MINUTES`                                       | tidak | Registrasi per IP (default 10 / 60)                                                                     |
+| `RATE_LIMIT_TENANT_CREATE_MAX`, `..._WINDOW_MINUTES`                                     | tidak | Pembuatan perusahaan per pengguna (default 10 / 60)                                                     |
+| `TRUSTED_PROXY`                                                                          | tidak | `true` hanya di belakang reverse proxy yang menyetel `X-Forwarded-For` (IP klien untuk pembatasan laju) |
+| `SECURITY_HSTS`                                                                          | tidak | `true` hanya di lingkungan HTTPS: kirim `Strict-Transport-Security`                                     |
+| `OPENAPI_ENABLED`                                                                        | tidak | Default `true` di development/test, **`false` di production**                                           |
+| `NODE_ENV`                                                                               | tidak | `development` (default) · `test` · `production`                                                         |
+| `SESSION_COOKIE_SECURE`                                                                  | tidak | Paksa cookie `Secure` di luar production (default `false`)                                              |
+| `DATABASE_POOL_MAX`, `DATABASE_IDLE_TIMEOUT_SECONDS`, `DATABASE_CONNECT_TIMEOUT_SECONDS` | tidak | Pool (default 10 / 30 dtk / 10 dtk; batas 1–100 / 1–3600 / 1–120)                                       |
+| `API_STANDALONE_PORT`                                                                    | tidak | Port `bun run api:standalone` (default 4000)                                                            |
+| `SEED_DEFAULT_PASSWORD`                                                                  | lokal | Password akun seed (`bun run db:seed`)                                                                  |
+| `REALTIME_HEARTBEAT_MS`                                                                  | tidak | Interval heartbeat SSE (default 5000; harus < idle timeout)                                             |
+| `NITRO_BUN_IDLE_TIMEOUT`                                                                 | tidak | Idle timeout `Bun.serve` produksi, detik (default Bun 10)                                               |
 
 \* wajib untuk menjalankan migrasi.
 
@@ -70,9 +80,15 @@ start dengan pesan yang jelas — tidak ada fallback diam-diam.
 | `agentic_owner`   | LOGIN   | Pemilik skema/tabel; menjalankan migrasi                                           |
 | `agentic_app`     | LOGIN   | Role aplikasi: `NOSUPERUSER NOBYPASSRLS`, anggota `agentic_runtime`, bukan pemilik |
 
-Pemisahan ini wajib: pemilik tabel dan superuser dapat melewati RLS. Aplikasi **menolak melayani request**
-(503 `SERVICE_MISCONFIGURED`) bila role runtime ternyata superuser, memiliki `BYPASSRLS`, memiliki tabel
-tenant-scoped, atau RLS belum dipaksa (`FORCE ROW LEVEL SECURITY`).
+Pemisahan ini wajib: pemilik tabel dan superuser dapat melewati RLS. Gerbang kesiapan (fail-closed) **menolak
+melayani request tenant** (503) sampai verifikasi berhasil: database terjangkau (`DATABASE_UNAVAILABLE`, dicoba
+ulang tiap 2 detik, pulih sendiri) dan role runtime aman (`SERVICE_MISCONFIGURED` bila superuser, `BYPASSRLS`,
+pemilik tabel tenant, RLS belum dipaksa, atau ada tabel ber-`tenant_id` di luar `RLS_PROTECTED_TABLES`; diperiksa
+ulang tiap 60 detik). `/api/v1/health` melaporkan state gerbang. Mode standalone berhenti (exit 1) bila role
+tidak aman saat start. Lihat `docs/architecture.md`.
+
+Setelah menarik perubahan yang membawa migrasi baru (mis. `0007_membership_write_permissions.sql`), jalankan
+`bun run db:migrate` (dan `bun run db:migrate:test`); migrasi menerapkan kebijakan RLS baru tanpa mengubah data.
 
 ### Bootstrap (lokal)
 
@@ -150,12 +166,14 @@ memerlukan HTTPS: cookie sesi memakai prefix `__Host-` dan atribut `Secure`.
 
 ## 6. Test
 
-| Perintah            | Butuh PostgreSQL | Butuh build | Isi                                                                                               |
-| ------------------- | ---------------- | ----------- | ------------------------------------------------------------------------------------------------- |
-| `bun run test:unit` | tidak            | tidak       | Config, CSRF, token, throttle, slug, util frontend                                                |
-| `bun run test`      | **ya**           | tidak       | Unit + integrasi (API, OpenAPI, Eden, auth, migrasi) + keamanan (isolasi tenant, RLS, pool, CSRF) |
-| `bun run test:nuxt` | tidak            | tidak       | Komponen shadcn-vue, invalidasi cache saat ganti tenant                                           |
-| `bun run test:e2e`  | **ya**           | **ya**      | Server production: SSR, `/api`, OpenAPI, cookie, SSE                                              |
+| Perintah            | Butuh PostgreSQL | Butuh build | Isi                                                                                                                                                                          |
+| ------------------- | ---------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bun run test:unit` | tidak*           | tidak       | Config, CSRF, token, pembatas laju, slug, util frontend, mesin/geometri/simulasi Virtual Office                                                                              |
+| `bun run test`      | **ya**           | tidak       | Unit + integrasi (API, Eden, auth, migrasi, gerbang kesiapan, standalone, konsistensi tenant, pembatasan laju) + keamanan (isolasi tenant, RLS, pengerasan 0007, pool, CSRF) |
+| `bun run test:nuxt` | tidak            | tidak       | Komponen, renderer dunia, ganti tenant lintas tab, logout                                                                                                                    |
+| `bun run test:e2e`  | **ya**           | **ya**      | Server production: SSR, `/api`, header keamanan (CSP/HSTS/no-store), cookie, SSE, harness QA 404, server dengan DB mati                                                      |
+
+\* preload Bun Test menerapkan migrasi bila `TEST_DATABASE_MIGRATION_URL` terisi (Bun memuat `.env` otomatis).
 
 Test yang memakai database membaca `TEST_DATABASE_URL` dan `TEST_DATABASE_MIGRATION_URL`; preload Bun Test
 (`tests/helpers/preload.ts`) menerapkan migrasi ke database test. Bila variabel tersebut kosong, test database

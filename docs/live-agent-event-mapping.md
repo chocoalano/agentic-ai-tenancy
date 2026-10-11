@@ -23,10 +23,10 @@ Penempatan robot di workstation dan pemilihan karakter (Nova/Sage/…) adalah **
 
 ## 2. Event yang dipetakan (nyata)
 
-| Event SSE   | Data                                                            | Aksi game (`mapRealtimeEvent`)                                                                              |
-| ----------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `ready`     | `tenantId`, `connectionId`, `serverTime`, `heartbeatIntervalMs` | `resync`: muat ulang snapshot agent dari API (`refresh()` → `engine.setAgents`), lalu `confirm(serverTime)` |
-| `heartbeat` | `serverTime`                                                    | `confirm(serverTime)`: perbarui waktu konfirmasi terakhir                                                   |
+| Event SSE   | Data                                                            | Aksi game (`mapRealtimeEvent`)                                                                                                                                                                   |
+| ----------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ready`     | `tenantId`, `connectionId`, `serverTime`, `heartbeatIntervalMs` | `resync`: muat ulang snapshot agent dari API (`refresh()` → `engine.setAgents`), lalu `confirm(serverTime)`; bila `tenantId` ≠ tenant aktif tab → `useAuth().revalidate()` (tab usang, lihat §6) |
+| `heartbeat` | `serverTime`                                                    | `confirm(serverTime)`: perbarui waktu konfirmasi terakhir                                                                                                                                        |
 
 **Sinkronisasi ulang saat (re)koneksi.** Transport SSE (`app/utils/realtime-sse.ts`) menyambung ulang dengan
 exponential backoff (1 s → 30 s); 401/403 tidak dicoba ulang. Setiap koneksi baru diawali `ready`, sehingga snapshot
@@ -98,7 +98,26 @@ harus memakai `withTenantTransaction` (RLS) seperti modul lain.
   Terukur ulang di build produksi dengan konfigurasi default: 1 koneksi selama 40 detik, 0 kegagalan.
   `NITRO_BUN_IDLE_TIMEOUT` (detik, maks. 255) dapat dinaikkan bila heartbeat yang lebih jarang diinginkan.
 
-## 6. Pengujian
+## 6. Konsistensi tenant lintas tab
+
+Tenant aktif melekat pada **sesi** (`sessions.active_tenant_id`), jadi berlaku untuk semua tab. Agar tab yang tidak
+mengganti tenant tidak menampilkan atau menyimpan data tenant yang salah:
+
+- setiap request tenant-scoped dari `useTenantAsyncData` membawa header `x-active-tenant` (tenant yang dikira aktif
+  oleh tab); backend membandingkannya dengan tenant sesi dan menjawab **409 `TENANT_MISMATCH` tanpa data** bila
+  berbeda (`api/core/auth/guard.ts`). Header ini bukan otorisasi: identitas dan keanggotaan tetap dari sesi/database;
+- cache tenant memakai kunci `tenant:<id>:<name>`, sehingga data tenant lama tidak pernah tampil untuk tenant baru,
+  dan respons 409 tidak mengisi cache mana pun; 409 memicu `useAuth().revalidate()` yang membaca ulang konteks
+  otoritatif, membuang `tenant:*` bila pengguna/tenant berubah, lalu mengambil data ulang;
+- tab yang mengganti tenant/masuk mengirim `session-changed` lewat BroadcastChannel `aivo-auth-sync`
+  (`app/plugins/auth-sync.client.ts`); tab lain `revalidate()`. Tab juga `revalidate()` saat kembali fokus/terlihat;
+- stream SSE: `ready` membawa tenant sesi (tabel §2) — tenant berbeda → `revalidate()`; stream juga ditolak 409
+  sebelum dibuka bila header tab usang;
+- **logout** mengosongkan state/cache dan mengirim `logged-out` **hanya** bila server mengonfirmasi (200) atau
+  menyatakan sesi memang tidak valid (401). Kegagalan jaringan/server mengembalikan error (UserMenu/GameMenu
+  menawarkan coba lagi) tanpa berpura-pura sudah keluar; tab lain yang menerima `logged-out` diarahkan ke `/login`.
+
+## 7. Pengujian
 
 - `tests/unit/office-engine.test.ts`: `ready` → `resync` + `confirm`; `heartbeat` → `confirm`; `liveAgentSpecs`
   memakai status otoritatif (aktif → siaga, lainnya → offline); perintah bisnis tidak didukung di live, perintah visual
@@ -106,6 +125,12 @@ harus memakai `withTenantTransaction` (RLS) seperti modul lain.
 - `tests/unit/config.test.ts`: heartbeat default 5000; kombinasi heartbeat ≥ idle timeout ditolak.
 - `tests/nuxt/components.test.ts`: panel live menonaktifkan perintah bisnis dan instruksi ("Runtime belum
   terhubung"); kontrol persetujuan tidak tampil di live; dunia live merender agent nyata dengan sprite sheet.
+- `tests/nuxt/tenant-switch.test.ts` (11 kasus): ganti tenant di satu tab (cache dibuang, konteks dimuat ulang, tab
+  lain diberi tahu; header `x-active-tenant` dikirim; switch ditolak tidak mengubah apa pun; ganti beruntun →
+  tenant terakhir), tenant berubah di tab lain (BroadcastChannel; request in-flight 409 tidak mengisi cache lama;
+  SSE `ready` tenant lain; logout di tab lain → `/login`), logout (gagal → tetap masuk + error; sukses → bersih).
+- `tests/integration/tenant-consistency.test.ts` (7 kasus): header cocok/kosong/usang/rusak, ganti beruntun, SSE
+  ditolak sebelum dibuka, header tidak memberi akses ke tenant yang bukan milik pengguna.
 - `tests/e2e/production.test.ts` (build produksi): SSE melalui mount Nitro (`ready` lalu `heartbeat`, dapat
   dibatalkan), SSE ditolak tanpa sesi, SSR `/office` memuat data tenant aktif lalu berganti saat switch tenant.
   Isolasi tenant lintas modul diuji di `tests/integration` dan `tests/security`.

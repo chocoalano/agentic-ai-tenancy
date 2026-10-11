@@ -19,17 +19,18 @@
 
 ## Autentikasi
 
-| Aspek             | Implementasi                                                                                                                 |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Password          | Argon2id (`Bun.password`, m=19 MiB, t=2), panjang 10–128                                                                     |
-| Token sesi        | 32 byte acak (base64url) di cookie; DB menyimpan **HMAC-SHA256(SESSION_SECRET, token)**                                      |
-| Cookie            | `HttpOnly`, `SameSite=Lax`, `Path=/`; production: `Secure` + prefix `__Host-aivo_session`                                    |
-| Kedaluwarsa       | Absolut (`SESSION_TTL_HOURS`, default 7 hari); `last_seen_at` diperbarui maks. tiap 5 menit                                  |
-| Pencabutan        | Logout mengisi `revoked_at`; cookie lama langsung ditolak                                                                    |
-| Login gagal       | Pesan sama untuk email tak dikenal & password salah; verifikasi dummy hash menyamakan waktu                                  |
-| Brute force       | Throttle per email (default 5 gagal / 15 menit → 429 + `Retry-After`), in-memory per proses                                  |
-| CSRF              | Fetch Metadata (`Sec-Fetch-Site`) + fallback `Origin` vs `Host` untuk semua metode mutasi, plus `SameSite=Lax` dan body JSON |
-| Token di frontend | Tidak ada. Tidak ada `localStorage` token; JavaScript tidak dapat membaca cookie sesi                                        |
+| Aspek             | Implementasi                                                                                                                                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Password          | Argon2id (`Bun.password`, m=19 MiB, t=2), panjang 10–128                                                                                                                                                                                                                      |
+| Token sesi        | 32 byte acak (base64url) di cookie; DB menyimpan **HMAC-SHA256(SESSION_SECRET, token)**                                                                                                                                                                                       |
+| Cookie            | `HttpOnly`, `SameSite=Lax`, `Path=/`; production: `Secure` + prefix `__Host-aivo_session`                                                                                                                                                                                     |
+| Kedaluwarsa       | Absolut (`SESSION_TTL_HOURS`, default 7 hari); `last_seen_at` diperbarui maks. tiap 5 menit                                                                                                                                                                                   |
+| Pencabutan        | Logout mengisi `revoked_at`; cookie lama langsung ditolak                                                                                                                                                                                                                     |
+| Login gagal       | Pesan sama untuk email tak dikenal & password salah; verifikasi dummy hash menyamakan waktu                                                                                                                                                                                   |
+| Brute force       | Pembatas laju ATOMIK (periksa-dan-hitung sebelum verifikasi): per email (5 gagal / 15 menit, sukses mereset), per IP apa pun emailnya (30 / 15 menit), registrasi per IP (10 / jam), pembuatan perusahaan per pengguna (10 / jam) → 429 + `Retry-After`; in-memory per proses |
+| IP klien          | Soket (standalone) atau header internal yang ditulis middleware Nitro (mount); `X-Forwarded-For` hanya bila `TRUSTED_PROXY=true`; header klien lain tidak dipercaya                                                                                                           |
+| CSRF              | Fetch Metadata (`Sec-Fetch-Site`) + fallback `Origin` vs `Host` untuk semua metode mutasi, plus `SameSite=Lax` (jenis body tidak diperiksa)                                                                                                                                   |
+| Token di frontend | Tidak ada. Tidak ada `localStorage` token; JavaScript tidak dapat membaca cookie sesi                                                                                                                                                                                         |
 
 Identitas pengguna **hanya** berasal dari sesi. Header seperti `x-user-id`/`x-tenant-id` dari klien diabaikan
 (diuji di `tests/integration/auth.test.ts`).
@@ -40,7 +41,8 @@ Route mendeklarasikan izin lewat macro: `{ tenant: 'agents.read' }` (`api/core/a
 
 ```text
 1. Autentikasi        cookie → hash HMAC → sessions (belum dicabut, belum kedaluwarsa, user aktif)
-2. Resolusi tenant    sessions.active_tenant_id (dipilih via POST /v1/tenants/:id/switch)
+2. Resolusi tenant    sessions.active_tenant_id (di-set saat login/registrasi, diganti via POST /v1/tenants/:id/switch);
+                      header opsional x-active-tenant dari tab harus cocok, selain itu 409 TENANT_MISMATCH
 3. Verifikasi anggota resolveTenantContext(): tenant_memberships aktif + tenant aktif (konteks app.user_id)
 4. Resolusi izin      membership_roles → roles → role_permissions → permissions
 5. Transaksi          withTenantTransaction(sql, context, fn) → BEGIN
@@ -78,14 +80,14 @@ app.current_user_id()   = nullif(current_setting('app.user_id', true), '')::uuid
 
 Semua tabel tenant memakai `ENABLE` **dan** `FORCE ROW LEVEL SECURITY` (pemilik tabel pun tunduk).
 
-| Tabel                | SELECT                                                         | Tulis                                                                             |
-| -------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `agents`             | `tenant_id = current_tenant`                                   | sama (USING + WITH CHECK)                                                         |
-| `tenants`            | `id = current_tenant` **atau** anggota aktif                   | insert: `id = current_tenant` & `created_by = current_user`; update: tenant aktif |
-| `tenant_memberships` | `tenant_id = current_tenant` **atau** `user_id = current_user` | tenant aktif                                                                      |
-| `membership_roles`   | tenant aktif **atau** keanggotaan milik pengguna               | tenant aktif (+ trigger: peran harus sistem/tenant sama)                          |
-| `roles`              | sistem, tenant aktif, atau tenant tempat pengguna anggota      | hanya peran kustom tenant aktif                                                   |
-| `role_permissions`   | mengikuti visibilitas `roles`                                  | hanya peran kustom tenant aktif                                                   |
+| Tabel                | SELECT                                                         | Tulis                                                                                                                                                            |
+| -------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agents`             | `tenant_id = current_tenant`                                   | sama (USING + WITH CHECK)                                                                                                                                        |
+| `tenants`            | `id = current_tenant` **atau** anggota aktif                   | insert: `id = current_tenant` & `created_by_user_id = current_user`; update: tenant aktif                                                                        |
+| `tenant_memberships` | `tenant_id = current_tenant` **atau** `user_id = current_user` | tenant aktif **dan** `app.has_permission('members.manage')`; pengecualian bootstrap: pembuat tenant untuk dirinya sendiri (0007)                                 |
+| `membership_roles`   | tenant aktif **atau** keanggotaan milik pengguna               | tenant aktif **dan** `members.manage` (+ trigger: peran harus sistem/tenant sama); bootstrap: pembuat tenant → peran sistem `owner` untuk keanggotaannya sendiri |
+| `roles`              | sistem, tenant aktif, atau tenant tempat pengguna anggota      | hanya peran kustom tenant aktif **dan** `members.manage`                                                                                                         |
+| `role_permissions`   | mengikuti visibilitas `roles`                                  | hanya peran kustom tenant aktif **dan** `members.manage`                                                                                                         |
 
 > **Perhatian:** kebijakan `tenant_memberships`, `membership_roles`, dan `roles` sengaja memakai `OR` agar
 > pengguna dapat melihat keanggotaannya sendiri lintas tenant (tenant switcher, resolusi izin). Akibatnya, query
@@ -96,10 +98,25 @@ Semua tabel tenant memakai `ENABLE` **dan** `FORCE ROW LEVEL SECURITY` (pemilik 
 `users` dan `sessions` tidak memakai RLS tenant: keduanya global dan hanya diakses melalui repository auth/users.
 Penguatan berikutnya (Wave 2): akses sesi via fungsi `SECURITY DEFINER` sempit.
 
+### Pengerasan 0007: penulisan keanggotaan/peran memerlukan izin (ditegakkan database)
+
+Audit menemukan eskalasi hak nyata: kebijakan tulis lama hanya memeriksa `tenant_id`, sehingga anggota biasa dalam
+konteks tenant dapat menautkan peran `owner` ke keanggotaannya sendiri bila ada jalur aplikasi yang lalai.
+Migrasi `0007_membership_write_permissions.sql` menambahkan `app.has_permission(text)` (membaca keanggotaan →
+peran → izin pengguna saat ini di tenant aktif, di bawah RLS yang sama) dan mensyaratkannya pada setiap
+INSERT/UPDATE/DELETE di `tenant_memberships`, `membership_roles`, `roles`, dan `role_permissions`. Pengecualian
+terkontrol: `app.is_tenant_creator()` — pembuat tenant (`tenants.created_by_user_id`) boleh membuat keanggotaan
+untuk dirinya sendiri dan menautkan **hanya** peran sistem `owner` ke keanggotaannya (alur registrasi/pembuatan
+perusahaan). Kebijakan tidak boleh men-subselect relasinya sendiri (PostgreSQL menolak dengan "infinite recursion
+detected in policy"); pembacaan lewat fungsi aman. Diuji di `tests/security/tenant-hardening.test.ts` dan
+`tests/security/rls.test.ts`.
+
 ### Role database
 
 Aplikasi berjalan dengan `agentic_app` (NOSUPERUSER, NOBYPASSRLS, bukan pemilik). `inspectRuntimeRole()`
-memeriksa hal ini saat start dan di `/v1/health`; bila tidak aman, API menolak melayani (503).
+memeriksa hal ini (termasuk: setiap tabel publik ber-kolom `tenant_id` harus ada di `RLS_PROTECTED_TABLES`,
+dibaca dari `pg_catalog`) lewat gerbang kesiapan fail-closed: request tenant ditolak 503 sampai verifikasi
+berhasil, dan diperiksa ulang berkala (`docs/architecture.md`).
 
 ### Pool koneksi
 

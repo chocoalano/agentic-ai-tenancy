@@ -161,8 +161,15 @@ Nuxt 4 (layout game) → GameOffice.vue (HUD, panel, shadcn-vue)
   render), sehingga robot ikut di-SSR tanpa hydration mismatch. `OfficeActor` hanya memakai posisi Vue untuk render
   pertama (non-reaktif), lalu renderer menjadi pemiliknya.
 - **Hit testing** memakai tombol DOM asli per robot (fokus keyboard, tooltip, `aria-label`).
-- **Reduced motion.** Dengan `prefers-reduced-motion` (dibaca live via `matchMedia`) robot tiba seketika tanpa animasi
-  jalan/teleport, loop animasi berhenti di frame 0, dan pulsa CSS dimatikan (`motion-safe:`).
+- **Teleport keluar.** Kunci animasi per fase (`teleport:in` / `teleport:out`) memulai ulang pewaktuan frame saat fase
+  berganti, sehingga fase keluar diputar mundur 7 → 0 di portal tujuan. Sebelumnya frame mandek di akhir fase masuk
+  karena kedua fase memakai nama animasi yang sama; dikunci test `animasi teleport: masuk diputar maju (0→7), keluar
+diputar MUNDUR (7→0)`.
+- **Reduced motion (kebijakan).** Dengan `prefers-reduced-motion` (dibaca live via `matchMedia`): `moveTo` menempatkan
+  robot langsung di tujuan dan memicu `arrived` (tanpa jalan/teleport/orb); **semua** animasi — loop maupun non-loop
+  (celebrate, error, teleport) — diam di frame 0; pulsa CSS dimatikan (`motion-safe:`). State, label, ikon status, dan
+  gelembung tetap berubah sehingga informasinya tidak hilang; hanya geraknya yang ditiadakan. Dikunci test (`reduced
+motion: animasi non-loop diam di frame 0; state tetap berubah`).
 - **Pemantauan performa:** FPS dan frame terburuk per detik ditulis ke `data-fps` / `data-worst-frame-ms` pada elemen
   panggung (bukan state Vue). Dipakai oleh pengukuran di bawah.
 
@@ -199,12 +206,16 @@ bergantung pada DOM, sehingga renderer Pixi dapat ditambahkan sebagai implementa
 
 Skenario Project Atlas penuh, dunia 1672×941, Chrome headless (GPU Metal), nilai `data-fps` per detik:
 
-| Kondisi                           | FPS median | FPS min | Frame terburuk |
-| --------------------------------- | ---------: | ------: | -------------: |
-| Dev, CPU 1×                       |         60 |      60 |          17 ms |
-| Dev, CPU throttle 4×              |         59 |      52 |          67 ms |
-| Dev, CPU throttle 6×              |         59 |      36 |         100 ms |
-| Build production, CPU throttle 4× |         60 |      57 |          50 ms |
+| Kondisi                                        | FPS median | FPS min | Frame terburuk |
+| ---------------------------------------------- | ---------: | ------: | -------------: |
+| Dev, CPU 1×                                    |         60 |      60 |          17 ms |
+| Dev, CPU throttle 4×                           |         59 |      52 |          67 ms |
+| Dev, CPU throttle 6×                           |         59 |      36 |         100 ms |
+| Build production, CPU 1× (setelah stabilisasi) |         60 |      59 |          33 ms |
+| Build production, CPU throttle 4× (idem)       |         60 |      57 |          50 ms |
+
+Dua baris terakhir diukur ulang pada 11 Oktober 2026 setelah geometri pulau baru, kelima robot berjalan, dan
+animasi teleport keluar (143–150 sampel per detik selama skenario penuh). Renderer DOM dipertahankan (lihat §5).
 
 Kerja main thread (CDP `Performance.getMetrics`, 60 FPS): saat robot bergerak ±153 ms per detik (±15%), yaitu skrip
 ±4,9 ms, style ±51 ms, dan layout ±0,2 ms per detik. Saat semua siaga: ±109 ms per detik. Masih banyak ruang tersisa
@@ -228,10 +239,11 @@ Keduanya dikunci oleh test regresi (`tests/nuxt/office-renderer.test.ts`), yang 
 ## 7. Pengujian
 
 - `tests/unit/office-engine.test.ts`: kontrak atlas kelima karakter = `animation-spec`; urutan animasi selama
-  simulasi (walk, teleport, communicate, think, read, work, celebrate); alur persetujuan (celebrate/error); reduced
-  motion.
-- `tests/nuxt/office-renderer.test.ts`: renderer menulis posisi di frame pertama dan setiap frame saat berjalan;
-  robot disembunyikan dan orb tampil saat transit; Vue tidak menimpa posisi renderer.
+  simulasi (walk, teleport, communicate, think, read, work, celebrate); teleport masuk maju / keluar mundur dengan frame
+  yang berubah; alur persetujuan (celebrate/error); reduced motion (tiba seketika; animasi non-loop frame 0).
+- `tests/nuxt/office-renderer.test.ts`: renderer menulis posisi di frame pertama dan setiap frame saat berjalan (asal
+  ≠ tujuan); robot disembunyikan dan orb tampil saat transit antar pulau; pulau sama tanpa teleport; jarak nol tiba
+  seketika; state saat tiba (anchor tepat, aktivitas rencana, satu `arrived`); Vue tidak menimpa posisi renderer.
 - `tests/nuxt/components.test.ts`: sprite sheet v2 dipakai di dunia (live dan pratinjau).
 - `bun run check:assets`: 5 sprite sheet × 9 animasi sesuai kontrak.
 - Browser (puppeteer, dev dan production): animasi yang teramati selama skenario adalah `idle, communicate, think,

@@ -20,17 +20,29 @@ bun run build && bun run test:e2e
 1. Backend (`api/`): import relatif, tanpa alias Nuxt; route → service → repository; `api/index.ts` sinkron, tanpa `.listen()`.
 2. Data tenant hanya lewat `withTenantTransaction`; tabel tenant baru = `tenant_id NOT NULL` + `ENABLE`/`FORCE` RLS + masuk `RLS_PROTECTED_TABLES`.
 3. Query pada `tenant_memberships`/`membership_roles`/`roles` dalam konteks tenant wajib filter `tenant_id`.
-4. Identitas hanya dari cookie sesi; tenant pilihan klien selalu divalidasi ke database.
+4. Identitas hanya dari cookie sesi; tenant pilihan klien selalu divalidasi ke database. Header `x-active-tenant`
+   dari tab hanya pemeriksaan konsistensi (409 `TENANT_MISMATCH`), bukan otorisasi; di frontend pakai
+   `useTenantAsyncData` dan teruskan `request` ke setiap `$api`.
 5. Tanpa `any`, `@ts-ignore`, cast tidak aman, `v-html`, token di `localStorage`, secret di frontend.
 6. Frontend hanya `import type` dari `api/`; tipe data diturunkan dari `$api`.
 7. Schema respons mendeklarasikan status error; map status tanpa `as const`; timestamp `t.Date()`.
 8. Pakai primitive shadcn-vue; jangan menampilkan data palsu.
 9. Fitur tenant-scoped baru wajib disertai test isolasi.
 10. Jangan mengubah migrasi lama; buat file `db/migrations/NNNN_*.sql` baru.
-11. `/office` = game layar penuh (layout `game`). Artwork = PNG asli di `public/game-assets` (tidak diubah) + varian
-    v2 di `public/game-assets-v2` lewat registry `app/utils/game-assets.ts`; jangan menulis path `/game-assets(-v2)/...`
-    di komponen atau menggambar ulang aset dengan CSS. Lihat `docs/game-asset-quality-report.md`.
+11. `/office` = game layar penuh (layout `game`). Artwork = PNG asli di `public/game-assets` (tidak diubah) + runtime
+    `public/game-assets-v2` (varian v2 + artwork v3 **hasil generate AI** untuk 8 pulau & latar) lewat registry
+    `app/utils/game-assets.ts`; master/sumber artwork hanya di `design/` (jangan taruh PNG master di `public/`;
+    `check:assets` gagal bila ada berkas yatim). Geometri jalan/slot/portal pulau dari artwork
+    (`bun run assets:geometry`); jangan sunting `app/game/island-geometry.ts` manual. Jangan menulis path
+    `/game-assets(-v2)/...` di komponen atau menggambar ulang aset dengan CSS. Lihat `docs/game-asset-quality-report.md`.
 12. Mesin game `app/game/` (TS murni): satu loop rAF, renderer menulis DOM langsung, tanpa reaktivitas Vue per frame.
     Simulasi pratinjau berlabel SIMULASI, tanpa API tulis, bukan jalur eksekusi live; mode live hanya memetakan event
     SSE yang ada. Lihat `docs/character-animation-system.md`, `docs/office-simulation.md`,
     `docs/live-agent-event-mapping.md`.
+13. Halaman harness khusus pengembangan di `app/dev/*.vue` (didaftarkan modul inline `devOnlyPages` hanya saat
+    `nuxt dev`), bukan di `app/pages/`; build production harus 404.
+14. Backend fail-closed: request tenant tidak dilayani sebelum gerbang kesiapan (`api/core/database/readiness.ts`)
+    memverifikasi DB & role RLS (503, bukan fail-open). Pembatasan laju lewat `deps.limits` (`consume` atomik sebelum
+    kerja mahal); IP klien hanya dari `api/core/http/client-ip.ts`, bukan header klien. Header keamanan HTML
+    (CSP hash, HSTS opsional, no-store) di `server/plugins/security-headers.ts` — jangan menambah `unsafe-inline`
+    pada `script-src`.

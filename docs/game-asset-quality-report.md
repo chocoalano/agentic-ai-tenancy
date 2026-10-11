@@ -1,19 +1,30 @@
 # Laporan Kualitas Aset Game
 
-Pembaruan 11 Oktober 2026: **rekonstruksi statis sebagian selesai**. Latar kota dan delapan pulau utama kini
-memakai ilustrasi v3 dari referensi pengguna: Mission Hub, Web Research, Data Warehouse, Client Brief,
-Knowledge Base, Analytics Tool, Report Builder, dan Final Report. PNG hasil generasi beserta WebP untuk runtime
-disimpan terpisah di `public/game-assets-v2/` dengan akhiran `-v3`; semua PNG pack asli tetap utuh.
+Pembaruan 11 Oktober 2026: **rekonstruksi statis sebagian selesai**. Latar kota dan delapan pulau utama memakai
+artwork v3: Mission Hub, Web Research, Data Warehouse, Client Brief, Knowledge Base, Analytics Tool, Report Builder,
+dan Task Manager. Semua PNG pack asli tetap utuh.
 
-Generasi memakai tool bawaan `image_gen`, dengan prompt lengkap di
-`design/office-reconstruction/prompts.json`. Gambar latar tidak memuat UI, karakter, pulau utama, atau jalur;
-pulau memakai alpha transparan tanpa label/robot. Sembilan WebP berjumlah sekitar **2,2 MB**. Registry memilih
-varian rekonstruksi untuk render default, sedangkan `GameImage :v2="false"` tetap menampilkan sumber asli.
-Builder `assets:v2` secara eksplisit memilih tujuan prosedural sehingga tidak menimpa ilustrasi v3.
+**Asal artwork v3 (pengungkapan).** Latar `mission-city-v3` dan delapan pulau `*-v3` **dihasilkan oleh AI (image
+generation)** dari prompt di `design/office-reconstruction/prompts.json` dengan referensi visual pengguna — bukan
+karya ilustrator dan bukan bagian dari asset pack "Neon Mission Map". Hasil generasi tidak dapat direproduksi
+bit-identik dari prompt; master PNG-nya (9 berkas, ±17 MB) disimpan sebagai sumber di `design/office-reconstruction/`
+(**tidak di-deploy**), sedangkan runtime hanya memakai WebP di `public/game-assets-v2/` (9 berkas v3 ≈ **2,2 MB**).
+Gambar latar tidak memuat UI, karakter, pulau utama, atau jalur; pulau memakai alpha transparan tanpa label/robot.
+Registry memilih varian v3 untuk render default, `GameImage :v2="false"` tetap menampilkan sumber asli, dan builder
+`assets:v2` melewati tujuan yang memiliki varian v3 sehingga tidak menimpanya.
+
+**Higiene deployment aset (stabilisasi).** Sebelumnya `public/game-assets-v2/` berisi 72 berkas (**24,7 MB**):
+9 master PNG v3 (18 MB) ikut terlayani publik, dan 8 WebP pulau prosedural lama tidak dirujuk registry lagi. Kini
+55 berkas (**6,0 MB**; `public/game-assets/` tetap 79 berkas, 2,3 MB). `bun run check:assets` (bagian 9) gagal bila ada
+berkas yatim di `public/game-assets*` yang tidak dirujuk registry, sehingga regresi semacam ini tidak lolos gerbang.
+
+**Geometri dari artwork.** Permukaan jalan, slot, portal, dan spawn tiap pulau dikalibrasi dari artwork v3 oleh
+`bun run assets:geometry` (`docs/office-navigation-system.md` §1). Research Lab dan Training Center masih kliping v2
+pack asli yang didominasi bangunan tanpa permukaan jalan → ditandai **dekoratif** (dirender, tidak menerima agent).
 
 **Karakter, frame animasi artist, tile, dan dua pulau tambahan belum direkonstruksi.** Status keseluruhan belum
 LULUS. Audit dan tabel di bawah adalah catatan pack asli serta perbaikan prosedural sebelumnya; angka tersebut
-bukan audit kualitas ilustrasi v3.
+bukan audit kualitas artwork v3.
 
 ## Catatan audit awal
 
@@ -113,22 +124,23 @@ Tabel lengkap di [Lampiran B](#lampiran-b--perbandingan-asli--v2).
 Dibutuhkan artwork sumber atau ilustrator/generator. Identitas visual mengacu ke aset yang ada (Nova, Sage, Pixel,
 Bolt, Echo **tidak boleh** diganti karakter lain).
 
-| Prioritas | Aset                                               | Masalah                                           | Spesifikasi target                                                                                                                                                                                                                                                                                                              |
-| --------- | -------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1         | 5 karakter + frame animasi                         | satu pose statis, 84×106 px, sisi kanan terpotong | Per karakter: 9 animasi sesuai `docs/character-animation-system.md` (idle 8, walk 8 kanan, think 8, work 8, read 8, communicate 8, celebrate 8, teleport 8, error 6 frame), frame 192×224 px @1× (disarankan juga @2× 384×448), anchor kaki (96, 214), PNG/WebP alpha sungguhan, pencahayaan dari kiri atas, skala badan 176 px |
-| 2         | 10 pulau (`islands/*`)                             | tepi terpotong, halo, resolusi rendah             | Isometrik konsisten, ≥ 3× ukuran tampil saat ini (mis. mission hub ≥ 700 px lebar), alpha bersih tanpa latar, titik pivot di dasar pulau, ruang jalan datar di permukaan                                                                                                                                                        |
-| 3         | Latar `city-skyline`                               | 265×105 px                                        | ≥ 1920×760 px, dapat diulang horizontal, tanpa elemen UI                                                                                                                                                                                                                                                                        |
-| 4         | 9 tile (`tiles/*`)                                 | tepi bawah/samping terpotong                      | Utuh, ≥ 3× ukuran sekarang, alpha bersih                                                                                                                                                                                                                                                                                        |
-| 5         | 9 pose (`character-states/*` selain idle/thinking) | tepi terpotong                                    | Digantikan oleh frame animasi prioritas 1 (pose terpisah tidak lagi dibutuhkan untuk dunia)                                                                                                                                                                                                                                     |
-| 6         | 13 ikon terpotong (`icons/*`)                      | ubin terpotong + sisa label                       | Ikon utuh 128×128 px tanpa teks; alternatif: ikon vektor (lucide) yang sudah dipakai HUD                                                                                                                                                                                                                                        |
+| Prioritas | Aset                                                | Masalah                                                                        | Spesifikasi target                                                                                                                                                                                                                                                                                                              |
+| --------- | --------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1         | 5 karakter + frame animasi                          | satu pose statis, 84×106 px, sisi kanan terpotong                              | Per karakter: 9 animasi sesuai `docs/character-animation-system.md` (idle 8, walk 8 kanan, think 8, work 8, read 8, communicate 8, celebrate 8, teleport 8, error 6 frame), frame 192×224 px @1× (disarankan juga @2× 384×448), anchor kaki (96, 214), PNG/WebP alpha sungguhan, pencahayaan dari kiri atas, skala badan 176 px |
+| 2         | 2 pulau tersisa (`research-lab`, `training-center`) | kliping v2 kecil tanpa permukaan jalan (dekoratif); 8 pulau lain sudah v3 (AI) | Isometrik konsisten dengan v3, kanvas 1536×1024, alpha bersih tanpa latar, apron jalan datar di DEPAN bangunan dengan tebing batu biru-abu yang konsisten agar `assets:geometry` dapat mengalibrasinya otomatis                                                                                                                 |
+| 3         | Latar `city-skyline`                                | 265×105 px                                                                     | ≥ 1920×760 px, dapat diulang horizontal, tanpa elemen UI                                                                                                                                                                                                                                                                        |
+| 4         | 9 tile (`tiles/*`)                                  | tepi bawah/samping terpotong                                                   | Utuh, ≥ 3× ukuran sekarang, alpha bersih                                                                                                                                                                                                                                                                                        |
+| 5         | 9 pose (`character-states/*` selain idle/thinking)  | tepi terpotong                                                                 | Digantikan oleh frame animasi prioritas 1 (pose terpisah tidak lagi dibutuhkan untuk dunia)                                                                                                                                                                                                                                     |
+| 6         | 13 ikon terpotong (`icons/*`)                       | ubin terpotong + sisa label                                                    | Ikon utuh 128×128 px tanpa teks; alternatif: ikon vektor (lucide) yang sudah dipakai HUD                                                                                                                                                                                                                                        |
 
 Efek (8) sudah layak/diperbaiki dan tidak perlu dibuat ulang untuk prototipe; versi produksi tetap disarankan
 diekspor dari sumber dengan alpha asli.
 
 ## 6. Pemakaian di aplikasi
 
-- Dunia `/office` memakai varian v2 untuk pulau, tile, efek, latar; robot memakai sprite sheet
-  `agents/{karakter}/sheet.webp` (lihat `docs/character-animation-system.md`).
+- Dunia `/office` memakai artwork v3 (AI) untuk 8 pulau utama dan latar kota, varian v2 untuk 2 pulau dekoratif,
+  tile, dan efek; robot memakai sprite sheet `agents/{karakter}/sheet.webp` (lihat
+  `docs/character-animation-system.md`).
 - Pose `character-states/*` tidak dipakai sebagai animasi dunia (terpotong); tampil lengkap di galeri
   `/office/assets` dan satu pose (thinking) di quick view Mission Hub.
 - Galeri `/office/assets` memperlihatkan seluruh aset beserta label pratinjau.

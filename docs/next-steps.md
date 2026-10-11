@@ -46,6 +46,16 @@ tersedia.
 
 - `nuxt-elysia@1.0.0-beta.1` masih beta; shim tipe `app/types/nuxt-elysia-compat.d.ts` dapat dihapus bila upstream
   memperbaiki augmentasi `nuxt/schema`.
-- Throttle login dan readiness gate bersifat per proses.
-- Tenant aktif melekat pada sesi (berlaku untuk semua tab); pertimbangkan header tenant per tab bila diperlukan.
-- Belum ada CI pipeline; perintah verifikasi lengkap ada di README.
+- Pembatas laju dan gerbang kesiapan bersifat per proses (antarmuka `RateLimiter`/`ReadinessGate` siap diganti
+  implementasi Valkey untuk multi-instance).
+- Penguncian per email masih bisa disalahgunakan untuk mengunci email korban selama jendela waktu (per IP sudah
+  membatasi pelakunya); mitigasi lanjutan: CAPTCHA/bukti kerja setelah N kegagalan.
+- Tenant aktif melekat pada sesi (semua tab): tab konvergen lewat header `x-active-tenant` (409), BroadcastChannel,
+  revalidasi saat fokus, dan event SSE `ready` — bukan tenant per tab.
+- Stream SSE tidak memvalidasi ulang sesi/keanggotaan setelah dibuka (hanya `ready`/`heartbeat` tanpa data bisnis);
+  wajib ditambahkan sebelum event bisnis dikirim.
+- Sesi kedaluwarsa/dicabut belum dibersihkan dari tabel `sessions`.
+- Virtual Office: Research Lab & Training Center dekoratif (kliping v2 tanpa permukaan jalan); geometri Mission Hub
+  dikalibrasi manual; frame animasi robot masih prosedural; artwork pulau/latar v3 hasil generate AI tanpa sumber
+  yang dapat direproduksi (lihat `docs/game-asset-quality-report.md`).
+- Belum ada CI pipeline; urutan verifikasi ada di `CLAUDE.md`/`AGENTS.md`.

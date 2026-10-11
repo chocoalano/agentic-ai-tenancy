@@ -42,20 +42,30 @@ Penyedia hanya diakses melalui adapter yang dapat diganti.
 
 ### Path
 
-| Path                | Isi                                  |
-| ------------------- | ------------------------------------ |
-| `/api/v1/*`         | Route bisnis berversi                |
-| `/api/openapi`      | UI Scalar (terverifikasi dev & prod) |
-| `/api/openapi/json` | Spesifikasi OpenAPI 3                |
+| Path                | Isi                                                    |
+| ------------------- | ------------------------------------------------------ |
+| `/api/v1/*`         | Route bisnis berversi                                  |
+| `/api/openapi`      | UI Scalar — default hanya dev/test (`OPENAPI_ENABLED`) |
+| `/api/openapi/json` | Spesifikasi OpenAPI 3 (idem)                           |
 
 ### Factory sinkron + readiness gate
 
 Nitro 2 **tidak menunggu plugin async**. Saat factory melakukan I/O (mis. query database), request pertama dapat
 masuk sebelum `_elysiaApp` terpasang — terobservasi sebagai `TypeError ... undefined.location` di plugin klien
 saat SSR. Karena itu `api/index.ts` sengaja **sinkron**: konfigurasi divalidasi sinkron (env tidak valid →
-server gagal start), sedangkan verifikasi role database berjalan sekali di latar dan setiap request API menunggu
-hasilnya (`createReadinessGate`). Bila role tidak aman, API menolak semua request dengan 503 (fail-closed).
-Test e2e memverifikasi bahwa request pertama setelah start sudah dilayani Elysia.
+server gagal start), sedangkan verifikasi keamanan database berjalan lewat **gerbang kesiapan**
+(`api/core/database/readiness.ts`, dibuat `createApi`) yang **fail-closed**:
+
+- request tenant-scoped TIDAK PERNAH dilayani sebelum verifikasi berhasil (database terjangkau, role runtime bukan
+  superuser/BYPASSRLS/pemilik tabel, semua tabel ber-`tenant_id` terdaftar dan memakai FORCE RLS);
+- database belum terjangkau → 503 `DATABASE_UNAVAILABLE` (+ `Retry-After`), dicoba ulang paling cepat tiap 2 detik,
+  pulih sendiri tanpa restart; kegagalan konektivitas tidak pernah dianggap "lulus";
+- role/RLS tidak aman → 503 `SERVICE_MISCONFIGURED`, diperiksa ulang tiap 60 detik (perbaikan DBA terdeteksi);
+- satu pemeriksaan dibagi semua request paralel; `/v1/health` (melaporkan state gerbang) dan OpenAPI tidak ditahan.
+
+Mode standalone memakai gerbang yang sama dan berhenti (exit 1) bila role tidak aman saat start. Test e2e
+memverifikasi request pertama setelah start dilayani Elysia (200 atau 503), dan server dengan database yang tidak
+terjangkau menjawab 503 (bukan 500/menggantung).
 
 ## Struktur folder
 
@@ -67,21 +77,26 @@ api/                    Backend Elysia (tanpa alias/auto-import Nuxt; import rel
 ├── container.ts        Komposisi dependensi manual + readiness gate
 ├── core/
 │   ├── config/         Validasi env server
-│   ├── database/       Pool Bun SQL, helper transaksi (user/tenant), normalisasi error, cek role RLS
+│   ├── database/       Pool Bun SQL, helper transaksi (user/tenant), normalisasi error, cek role RLS, gerbang kesiapan
 │   ├── auth/           Password (Argon2id), token sesi (HMAC), cookie, guard (macro auth/tenant)
 │   ├── tenancy/        resolveTenantContext (keanggotaan → peran → izin)
-│   ├── security/       Proteksi CSRF (Fetch Metadata/Origin), throttle login
-│   ├── http/           Plugin global (request id, header, CSRF, error), logger
+│   ├── security/       Proteksi CSRF (Fetch Metadata/Origin), pembatas laju atomik (login/registrasi/tenant)
+│   ├── http/           Plugin global (request id, header, CSRF, gerbang kesiapan, error), IP klien, logger
 │   └── errors/         AppError + schema ApiError
 ├── modules/            health, auth, users, tenants, memberships, agents, realtime
 └── shared/             Schema TypeBox bersama
 domains/                Tipe & aturan domain murni (dipakai backend & frontend)
 db/                     migrations/*.sql, migrator.ts, seeds/development.ts
+server/                 Nitro: middleware IP klien, plugin header keamanan HTML (CSP/HSTS/no-store)
 app/                    Frontend Nuxt (pages, layouts, components, composables, utils, middleware, plugins)
 ├── components/ui/      Primitive shadcn-vue (hasil CLI, jangan ditulis ulang)
 ├── components/{app,office,agents,shared}/  Komponen domain
-tests/                  unit · integration · security · e2e (Bun Test) · nuxt (Vitest)
-scripts/                db-bootstrap, db-migrate, db-drop
+├── game/               Mesin Virtual Office (TS murni): dunia, geometri pulau, navigasi, mesin, simulasi, renderer DOM
+├── dev/                Halaman harness khusus `nuxt dev` (didaftarkan modul inline, tidak pernah di production)
+public/game-assets/     Asset pack asli (tidak diubah); public/game-assets-v2/ = aset runtime (v2 + artwork v3)
+design/                 Sumber artwork: asset pack mentah, master PNG rekonstruksi v3 + prompt-nya (tidak di-deploy)
+tests/                  unit · integration · security · e2e (Bun Test) · nuxt (Vitest) · fixtures (mask geometri)
+scripts/                db-bootstrap, db-migrate, db-drop, check/build/audit aset, kalibrasi geometri pulau
 ```
 
 ### Batas modul
@@ -96,12 +111,14 @@ scripts/                db-bootstrap, db-migrate, db-drop
 
 Repository tenant-scoped hanya menerima `TenantTransaction`, yang hanya dapat dibuat oleh
 `withTenantTransaction` (konstruktor dilindungi token simbol privat). Akibatnya query data tenant **secara tipe**
-tidak dapat dijalankan di luar konteks tenant yang sudah diverifikasi.
+tidak dapat dijalankan di luar konteks tenant yang sudah diverifikasi. Repository global (`users`, `sessions`)
+menerima pool `SQL` langsung karena tabelnya tidak tenant-scoped; pembuatan tenant memakai
+`withNewTenantTransaction`/`enterTenantBootstrap` (konteks tenant yang baru dibuat).
 
 ## Ekstraksi layanan di masa depan
 
-`createApi(deps)` tidak bergantung pada Nuxt/Nitro, membaca konfigurasi dari `process.env`, dan semua import
-backend bersifat relatif. `tsconfig.backend.json` mengetik ulang seluruh backend sebagai kode Bun murni.
+`createApi(deps)` tidak bergantung pada Nuxt/Nitro; konfigurasi dibaca sekali oleh `loadApiConfig()` dari
+`process.env` lalu diteruskan sebagai `deps.config`, dan semua import backend bersifat relatif. `tsconfig.backend.json` mengetik ulang seluruh backend sebagai kode Bun murni.
 `bun run api:standalone` menjalankan aplikasi yang sama sebagai server Elysia mandiri — inilah jalur ekstraksi
 (mis. gateway realtime WebSocket, worker orchestrator) tanpa menulis ulang domain logic.
 

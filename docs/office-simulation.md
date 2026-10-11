@@ -42,13 +42,15 @@ Status interaktivitas office di pratinjau: **BERFUNGSI**. Setiap perintah mengha
 | 11            | 5. Koordinasi     | Nova → Mission Hub: `communicating` 3 dtk                                                     | —                    |
 | 12            | 6. Selesai        | Kelima robot `completed` (animasi celebrate) 1,4 dtk → toast "Simulasi Project Atlas selesai" | Kirim ke klien       |
 
-Posisi awal: Nova di Client Brief, Sage di Web Research, Pixel di Analytics Tool, Bolt di Report Builder,
-Echo di Knowledge Base. Kelima karakter tersebar pada pulau utama mengikuti komposisi referensi. Fase yang sudah
-berada di tujuan langsung menjalankan aktivitas; perpindahan Echo dan Nova tetap memperlihatkan navigasi portal.
-Panel misi (kiri) menandai sasaran yang selesai (0/4 → 4/4); setiap sasaran berlabel DEMO/MISI CONTOH.
+Posisi awal (`ATLAS_START`) sengaja **berbeda dari tujuan fase**: Nova di Client Brief, Sage di Mission Hub (slot 0),
+Pixel di Knowledge Base, Bolt di Task Manager, Echo di Mission Hub (slot 1). Dengan demikian kelima robot benar-benar
+menempuh jalan → portal → teleport → jalan (Sage → Web Research, Pixel → Analytics Tool, Bolt → Report Builder,
+Echo → Data Warehouse, Nova → Mission Hub). Sebelumnya tiga robot diinisialisasi tepat di tujuannya sehingga hanya 2
+dari 5 yang pernah bergerak; kini dikunci test `posisi awal ≠ tujuan fase: kelima robot benar-benar berjalan`. Panel
+misi (kiri) menandai sasaran yang selesai (0/4 → 4/4); setiap sasaran berlabel DEMO/MISI CONTOH.
 
-Durasi terukur untuk penempatan awal versi sebelumnya pada kecepatan 1×: fase 2 mulai ±2 dtk, fase 3 ±10 dtk, fase 4 ±19 dtk, fase 5 ±28 dtk,
-fase 6 ±35 dtk, selesai ±36 dtk. Waktu berjalan dan teleport termasuk di dalamnya.
+Durasi terukur (build production, kecepatan 1×, Chrome headless): fase 2 mulai ±2 dtk, fase 3 ±12 dtk, fase 4
+±21,5 dtk, fase 5 ±30 dtk, fase 6 ±38,5 dtk, selesai ±40 dtk. Waktu berjalan dan teleport termasuk di dalamnya.
 
 ## 4. Kontroler simulasi
 
@@ -63,6 +65,13 @@ fase 6 ±35 dtk, selesai ±36 dtk. Waktu berjalan dan teleport termasuk di dalam
   tampil.
 - **Jeda/Lanjut** membekukan atau melanjutkan waktu mesin (posisi, frame, timer). **Kecepatan** 0,5× / 1× / 2×
   (dibatasi 0,25–3). **Reset** mengembalikan kelima robot ke posisi dan state awal.
+- **Jeda per robot** (`pauseActor`) menandai rencana robot itu `held`: tidak dihapus dan tidak dianggap selesai
+  diam-diam; robot berhenti `idle` (teleport yang sedang transit diselesaikan di portal tujuan). `resumeActor`
+  menerbitkan ulang gerak/aktivitas dengan durasi penuh. Event `arrived` hanya menyelesaikan aksi bila pulau tibanya =
+  `moveTo` aksi (tiba di tempat lain karena perintah manual tidak dihitung). Sebelumnya menjeda robot saat berjalan
+  membuat simulasi menggantung selamanya (aksi menunggu `arrived` yang tidak akan datang); kini dikunci test regresi:
+  jeda saat berjalan, saat transit teleport, saat bekerja, saat siaga, reset saat dijeda, dan siklus jeda/lanjut
+  berulang (per robot dan global). `heldActors` tersedia di snapshot untuk UI.
 - Status bar: `idle` → `running` ⇄ `paused` → `completed` (atribut `data-status` dipakai test).
 
 ## 5. Perintah pratinjau
@@ -107,14 +116,16 @@ Otomatis:
 
 - `tests/unit/office-engine.test.ts`: skenario berjalan sampai selesai; setiap aktor mencapai setiap aktivitas
   fasenya; `rejectedActions` kosong; animasi walk/teleport/communicate/think/read/work/celebrate muncul; posisi akhir
-  benar; jeda/lanjut/kecepatan/reset; reduced motion dan robot yang sudah di tujuan tidak menggantung; pengurai
+  benar; kelima robot menerbitkan event `route` (benar-benar berjalan); jeda/lanjut per robot dan global tidak pernah
+  menggantung (6 kasus); kecepatan/reset; reduced motion dan robot yang sudah di tujuan tidak menggantung; pengurai
   instruksi (5 contoh brief + persetujuan); alur persetujuan.
 - `tests/nuxt/components.test.ts`: panel pratinjau mengirim instruksi; blok persetujuan hanya di pratinjau.
 
 Browser (puppeteer, skrip di scratchpad; dev **dan** build production):
 
 - Skenario lengkap: 7 status fase, 8 animasi teramati, orb transit dan kilat portal terlihat, kelima robot berpindah,
-  panel misi 4/4, toast selesai, 0 galat konsol, 0 respons ≥ 400.
+  panel misi 4/4, toast selesai, 0 galat konsol, 0 respons ≥ 400. FPS median 60 / minimum 59 (CPU 1×) dan 60 / 57
+  (CPU diperlambat 4×).
 - Jeda membekukan posisi; lanjut menggerakkan lagi; reset mengembalikan status `idle`.
 - Persetujuan: setujui → `working/work → completed/celebrate → idle`; tolak → `failed/error → idle`.
 - Viewport 1672×941, 1920×1080, 1440×900, 768×1024, 390×844: panel perintah, quick view stasiun dan hub, Escape, zoom,
@@ -123,7 +134,7 @@ Browser (puppeteer, skrip di scratchpad; dev **dan** build production):
 
 Rekaman dan screenshot (`docs/screenshots/`):
 
-- `office-sim-project-atlas.mp4`: rekaman 43 dtk (build production) dari klik Nova sampai selesai.
+- `office-sim-project-atlas.mp4`: rekaman 50 dtk (build production) dari klik Nova sampai selesai.
 - `office-sim-1672x941-00-idle.jpg` … `07-completed.jpg`: setiap fase.
 - `office-sim-1672x941-08-approval-request.jpg`, `09-approval-rejected.jpg`: alur persetujuan.
 
