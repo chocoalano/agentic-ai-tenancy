@@ -38,7 +38,7 @@ const accessibleLabel = computed(
   >
     <span
       v-if="targeted"
-      class="pointer-events-none absolute left-1/2 top-[70%] block aspect-[2/1] w-[80%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-office-cyan shadow-[0_0_28px_var(--office-cyan)] motion-safe:animate-office-pulse"
+      class="pointer-events-none absolute left-1/2 top-[70%] block aspect-2/1 w-[80%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-office-cyan shadow-[0_0_28px_var(--office-cyan)] motion-safe:animate-office-pulse"
       aria-hidden="true"
     />
     <!-- Cahaya kristal -->

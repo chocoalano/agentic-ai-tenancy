@@ -272,7 +272,7 @@ defineExpose({
       <OfficeTeleportOrb v-for="agent in agents" :key="`orb-${agent.key}`" :agent-key="agent.key" />
 
       <OfficeLabels
-        class="z-[70]"
+        class="z-70"
         :station-states="stationStates"
         :occupants="occupants"
         :mission-completed="missionCompleted"

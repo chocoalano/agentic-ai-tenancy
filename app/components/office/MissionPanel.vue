@@ -120,7 +120,7 @@ function isSelected(step: MissionStepView): boolean {
             >
               <component
                 :is="STEP_ICON[step.status]"
-                :class="['size-[21px] shrink-0', STEP_TONE[step.status]]"
+                :class="['size-5.25 shrink-0', STEP_TONE[step.status]]"
                 aria-hidden="true"
               />
               <span :class="['flex-1', step.status === 'locked' ? 'text-blue-200/65' : 'text-blue-100']">{{

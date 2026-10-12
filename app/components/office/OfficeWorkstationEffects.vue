@@ -126,7 +126,7 @@ const LABEL: Record<WorkstationEffect, string> = {
     <span
       v-for="glow in ambient"
       :key="`ambient-${glow.id}`"
-      class="pointer-events-none absolute left-0 top-0 [transform:translate3d(calc(var(--ax)*var(--s)),calc(var(--ay)*var(--s)),0)]"
+      class="pointer-events-none absolute left-0 top-0 transform-[translate3d(calc(var(--ax)*var(--s)),calc(var(--ay)*var(--s)),0)]"
       :style="anchorStyle(glow)"
       :data-ambient-island="glow.id"
     >
@@ -139,7 +139,7 @@ const LABEL: Record<WorkstationEffect, string> = {
     <span
       v-for="item in placed"
       :key="item.key"
-      class="pointer-events-none absolute left-0 top-0 [transform:translate3d(calc(var(--ax)*var(--s)),calc(var(--ay)*var(--s)),0)]"
+      class="pointer-events-none absolute left-0 top-0 transform-[translate3d(calc(var(--ax)*var(--s)),calc(var(--ay)*var(--s)),0)]"
       :style="anchorStyle(item)"
       :data-workstation-effect="item.effect"
       :data-workstation-island="item.island"

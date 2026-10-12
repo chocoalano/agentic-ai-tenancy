@@ -46,7 +46,7 @@ const accessibleLabel = computed(
     <!-- Sorotan tujuan -->
     <span
       v-if="targeted"
-      class="pointer-events-none absolute left-1/2 top-[66%] block aspect-[2/1] w-[96%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-office-cyan shadow-[0_0_24px_var(--office-cyan)] motion-safe:animate-office-pulse"
+      class="pointer-events-none absolute left-1/2 top-[66%] block aspect-2/1 w-[96%] -translate-x-1/2 -translate-y-1/2 rounded-[50%] border-2 border-office-cyan shadow-[0_0_24px_var(--office-cyan)] motion-safe:animate-office-pulse"
       aria-hidden="true"
     />
     <!-- Pulau diam: robot berdiri di atasnya dengan kaki tertambat ke koordinat dunia. -->
@@ -55,7 +55,7 @@ const accessibleLabel = computed(
         :asset="ISLANDS[definition.id]"
         eager
         :class="[
-          'transition-[transform,filter] duration-300 group-hover/island:-translate-y-[3%] group-focus-visible/island:-translate-y-[3%]',
+          'transition-[transform,filter] duration-300 group-hover/island:translate-y-[-3%] group-focus-visible/island:translate-y-[-3%]',
           selected
             ? 'drop-shadow-[0_0_22px_color-mix(in_oklch,var(--office-cyan)_85%,transparent)]'
             : 'drop-shadow-[0_14px_22px_oklch(0.12_0.07_270/55%)] group-hover/island:drop-shadow-[0_0_18px_color-mix(in_oklch,var(--office-cyan)_60%,transparent)]',

@@ -80,7 +80,7 @@ const DOT: Record<string, string> = {
 <template>
   <div
     ref="root"
-    class="pointer-events-none absolute left-0 top-0 [transform:translate3d(calc(var(--ax)*var(--s)),calc(var(--ay)*var(--s)),0)]"
+    class="pointer-events-none absolute left-0 top-0 transform-[translate3d(calc(var(--ax)*var(--s)),calc(var(--ay)*var(--s)),0)]"
     :style="initialStyle"
     :data-actor="agent.key"
     :data-preview="agent.preview ? 'true' : undefined"

@@ -126,7 +126,7 @@ const liveConnections = computed(() => connections.value.filter((connection) => 
       me-raster jalur pulsa tipis ini, bukan halo ber-filter blur di lapisan statis.
     -->
     <svg
-      class="absolute inset-0 size-full overflow-visible [will-change:transform]"
+      class="absolute inset-0 size-full overflow-visible will-change-transform"
       :viewBox="`0 0 ${OFFICE_WORLD.width} ${OFFICE_WORLD.height}`"
       preserveAspectRatio="none"
       focusable="false"

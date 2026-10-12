@@ -612,7 +612,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
 
     <!-- Z7: pemberitahuan mode -->
     <div
-      class="pointer-events-none absolute left-1/2 top-[calc(var(--hud-top)+1.65rem)] z-[82] w-max max-w-[calc(100%-1rem)] -translate-x-1/2 xl:top-auto xl:bottom-[calc(var(--hud-bottom)+0.5rem)]"
+      class="pointer-events-none absolute left-1/2 top-[calc(var(--hud-top)+1.65rem)] z-82 w-max max-w-[calc(100%-1rem)] -translate-x-1/2 xl:top-auto xl:bottom-[calc(var(--hud-bottom)+0.5rem)]"
     >
       <SimulationBar
         v-if="preview && snapshot.simulation"
@@ -659,7 +659,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
 
     <!-- Z9: panel melayang (desktop) -->
     <div
-      class="pointer-events-none absolute inset-x-3 bottom-[calc(var(--hud-bottom)+0.25rem)] top-[calc(var(--hud-top)+0.5rem)] z-[85] hidden items-start justify-between gap-4 xl:flex"
+      class="pointer-events-none absolute inset-x-3 bottom-[calc(var(--hud-bottom)+0.25rem)] top-[calc(var(--hud-top)+0.5rem)] z-85 hidden items-start justify-between gap-4 xl:flex"
     >
       <div class="pointer-events-auto flex h-full w-[clamp(19rem,22vw,23rem)] min-h-0 flex-col items-start">
         <MissionPanel
@@ -688,7 +688,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
     </div>
 
     <!-- Tablet/ponsel: tab drawer melayang -->
-    <div class="absolute left-2 top-[calc(var(--hud-top)+2.75rem)] z-[85] xl:hidden">
+    <div class="absolute left-2 top-[calc(var(--hud-top)+2.75rem)] z-85 xl:hidden">
       <button
         type="button"
         class="hud-panel flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-office-cyan"
@@ -699,7 +699,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
         <span class="tabular-nums">{{ mission.completed }}/{{ mission.total }}</span>
       </button>
     </div>
-    <div class="absolute right-2 top-[calc(var(--hud-top)+2.75rem)] z-[85] xl:hidden">
+    <div class="absolute right-2 top-[calc(var(--hud-top)+2.75rem)] z-85 xl:hidden">
       <button
         type="button"
         class="hud-panel flex items-center gap-1.5 px-2.5 py-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-office-cyan"
@@ -755,7 +755,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
     <!-- Z9: quick-view -->
     <div
       v-if="selection"
-      class="absolute bottom-[calc(var(--hud-bottom)+0.5rem)] left-1/2 z-[95] max-h-[calc(100%-var(--hud-top)-var(--hud-bottom)-4rem)] w-[min(32rem,calc(100%-1rem))] -translate-x-1/2 overflow-y-auto"
+      class="absolute bottom-[calc(var(--hud-bottom)+0.5rem)] left-1/2 z-95 max-h-[calc(100%-var(--hud-top)-var(--hud-bottom)-4rem)] w-[min(32rem,calc(100%-1rem))] -translate-x-1/2 overflow-y-auto"
     >
       <AgentCommandPanel
         v-if="selectedAgent"
@@ -796,7 +796,7 @@ const zoomLevel = computed(() => world.value?.zoomLevel ?? 1)
     <!-- Ponsel: strip pemilih robot -->
     <div
       v-if="roster.length > 0"
-      class="absolute inset-x-2 bottom-[5.9rem] z-[88] md:hidden"
+      class="absolute inset-x-2 bottom-[5.9rem] z-88 md:hidden"
       role="group"
       :aria-label="preview ? 'Pilih karakter pratinjau' : 'Pilih AI employee'"
     >

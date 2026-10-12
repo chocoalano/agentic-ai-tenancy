@@ -73,14 +73,14 @@ function percent(value: number, total: number): string {
       <span
         v-for="node in nodes"
         :key="`island:${node.id}`"
-        class="pointer-events-none absolute w-[18%] -translate-x-1/2 -translate-y-[30%] opacity-45"
+        class="pointer-events-none absolute w-[18%] -translate-x-1/2 translate-y-[-30%] opacity-45"
         :style="{ left: percent(node.x, VIEW.width), top: percent(node.y, VIEW.height) }"
         aria-hidden="true"
       >
         <GameImage :asset="node.asset" />
       </span>
       <span
-        class="pointer-events-none absolute w-[23%] -translate-x-1/2 -translate-y-[40%] opacity-70"
+        class="pointer-events-none absolute w-[23%] -translate-x-1/2 translate-y-[-40%] opacity-70"
         :style="{ left: percent(hub.x, VIEW.width), top: percent(hub.y, VIEW.height) }"
         aria-hidden="true"
       >
