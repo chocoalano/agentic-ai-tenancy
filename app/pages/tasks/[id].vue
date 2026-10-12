@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ArrowLeft, Ban, CircleOff, FileText } from '@lucide/vue'
+import { Ban, Bot, CircleOff, FileText, History, ScrollText, ShieldCheck } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import { isTerminalTaskStatus } from '~~/domains/tasks/types'
 import { ACTIVE_TENANT_HEADER } from '~~/domains/tenancy/headers'
 
 /*
- * /tasks/:id — detail tugas nyata: run per percobaan, jejak event, hasil model
+ * /tasks/:id — detail misi (tugas nyata): run per percobaan, hasil model
  * (teks, dirender aman tanpa HTML), persetujuan tertunda, pembatalan.
  */
 definePageMeta({ layout: 'app', middleware: 'auth', title: 'Detail Tugas' })
@@ -93,29 +93,30 @@ const canDecide = computed(() => auth.can('approvals.decide'))
 
 <template>
   <div class="space-y-6">
-    <Button variant="ghost" size="sm" as-child class="-ml-2">
-      <NuxtLink to="/tasks"><ArrowLeft class="size-4" aria-hidden="true" />Kembali ke riwayat</NuxtLink>
-    </Button>
-
-    <div v-if="status === 'pending' && !data" class="space-y-4" aria-busy="true">
-      <Skeleton class="h-24 w-full rounded-xl" />
-      <Skeleton class="h-64 w-full rounded-xl" />
-    </div>
+    <GameLoadingState v-if="status === 'pending' && !data" :rows="4" label="Memuat tugas…" />
     <EmptyState
       v-else-if="error?.statusCode === 404"
       :icon="CircleOff"
       title="Tugas tidak ditemukan"
       description="Tugas ini tidak ada di perusahaan aktif Anda."
-    />
+    >
+      <Button variant="outline" size="sm" as-child><NuxtLink to="/tasks">Kembali ke papan misi</NuxtLink></Button>
+    </EmptyState>
     <ErrorState v-else-if="error" :error="error" :retry="refresh" />
     <template v-else-if="data">
-      <PageHeader
-        eyebrow="Tugas"
+      <GamePageHeader
+        identity="Mission Detail"
         :title="data.task.title"
-        :description="`${data.task.agentName} · ${data.task.priority}`"
+        :description="`${data.task.agentName} · prioritas ${data.task.priority}`"
+        back-to="/tasks"
+        back-label="Kembali ke Mission Board"
       >
-        <template #actions>
+        <template #meta>
           <TaskStatusBadge :status="data.task.status" />
+          <span v-if="data.task.requiresApproval" class="demo-tag">Persetujuan</span>
+          <span class="game-chip tabular-nums">run {{ data.task.attempts }}/{{ data.task.maxAttempts }}</span>
+        </template>
+        <template #actions>
           <Button
             v-if="canCancel"
             variant="destructive"
@@ -128,23 +129,26 @@ const canDecide = computed(() => auth.can('approvals.decide'))
             <Ban class="size-4" aria-hidden="true" />Batalkan
           </Button>
         </template>
-      </PageHeader>
+      </GamePageHeader>
 
-      <Alert v-if="data.task.errorMessage" variant="destructive" data-task-error>
-        <AlertTitle>{{ data.task.errorCode }}</AlertTitle>
-        <AlertDescription>{{ data.task.errorMessage }}</AlertDescription>
-      </Alert>
+      <GamePanel
+        v-if="data.task.errorMessage"
+        variant="warning"
+        :title="data.task.errorCode ?? 'Gagal'"
+        :description="data.task.errorMessage"
+        padding="sm"
+        data-task-error
+      />
 
-      <div
+      <GamePanel
         v-if="data.pendingApproval"
-        class="glass rounded-xl border border-office-orange/50 p-4"
+        variant="warning"
+        title="Persetujuan dibutuhkan"
+        :description="`${data.pendingApproval.actionSummary} · kedaluwarsa ${formatter.format(data.pendingApproval.expiresAt)}`"
+        :icon="ShieldCheck"
         data-approval-pending
       >
-        <p class="font-semibold">Persetujuan dibutuhkan</p>
-        <p class="text-sm text-muted-foreground">
-          {{ data.pendingApproval.actionSummary }} · kedaluwarsa {{ formatter.format(data.pendingApproval.expiresAt) }}
-        </p>
-        <div v-if="canDecide" class="mt-3 flex gap-2">
+        <div v-if="canDecide" class="flex gap-2">
           <Button size="sm" :disabled="busy" data-approval-approve @click="decide(data.pendingApproval.id, 'approve')"
             >Setujui</Button
           >
@@ -157,84 +161,89 @@ const canDecide = computed(() => auth.can('approvals.decide'))
             >Tolak</Button
           >
         </div>
-        <p v-else class="mt-2 text-xs text-muted-foreground">Butuh izin approvals.decide untuk memutuskan.</p>
-      </div>
+        <p v-else class="type-support text-xs">Butuh izin approvals.decide untuk memutuskan.</p>
+      </GamePanel>
 
-      <div class="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-        <Card class="glass">
-          <CardHeader>
-            <CardTitle class="font-heading">Hasil</CardTitle>
-            <CardDescription>
-              <template v-if="data.output"
-                >Keluaran yang dipersistenkan dari run {{ data.output.runId.slice(0, 8) }} ·
-                {{ formatter.format(data.output.createdAt) }}</template
+      <div class="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <GamePanel :variant="data.output ? 'success' : 'holo'" title="Hasil" :icon="FileText">
+          <template #header>
+            <div class="flex min-w-0 items-start gap-3">
+              <span
+                class="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-game-cyan/12 text-game-cyan ring-1 ring-inset ring-game-cyan/25"
+                aria-hidden="true"
               >
-              <template v-else-if="data.task.output && !data.task.output.released"
-                >Hasil menunggu persetujuan sebelum dapat dilihat.</template
-              >
-              <template v-else>Belum ada hasil.</template>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre
-              v-if="data.output"
-              class="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-muted/40 p-4 text-sm leading-relaxed"
-              data-task-output
-              >{{ data.output.content }}</pre>
-            <p v-else class="text-sm text-muted-foreground">
-              <FileText class="mr-1 inline size-4" aria-hidden="true" />Tidak ada konten untuk ditampilkan.
-            </p>
-          </CardContent>
-        </Card>
+                <FileText class="size-4" />
+              </span>
+              <div class="min-w-0 space-y-0.5">
+                <h2 class="type-section-title">Hasil</h2>
+                <p class="type-support">
+                  <template v-if="data.output"
+                    >Keluaran yang dipersistenkan dari run {{ data.output.runId.slice(0, 8) }} ·
+                    {{ formatter.format(data.output.createdAt) }}</template
+                  >
+                  <template v-else-if="data.task.output && !data.task.output.released"
+                    >Hasil menunggu persetujuan sebelum dapat dilihat.</template
+                  >
+                  <template v-else>Belum ada hasil.</template>
+                </p>
+              </div>
+            </div>
+          </template>
+          <pre
+            v-if="data.output"
+            class="game-panel game-panel-sunken game-scrollbar max-h-[32rem] overflow-auto whitespace-pre-wrap p-4 text-sm leading-relaxed"
+            data-task-output
+            >{{ data.output.content }}</pre>
+          <p v-else class="type-support">Tidak ada konten untuk ditampilkan.</p>
+        </GamePanel>
 
         <div class="space-y-6">
-          <Card class="glass">
-            <CardHeader>
-              <CardTitle class="font-heading">Instruksi</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p class="whitespace-pre-line text-sm leading-relaxed" data-task-instruction>
-                {{ data.task.instruction }}
-              </p>
-              <Separator class="my-4" />
-              <dl class="grid grid-cols-2 gap-2 text-xs">
-                <dt class="text-muted-foreground">Dibuat</dt>
-                <dd>{{ formatter.format(data.task.createdAt) }}</dd>
-                <dt class="text-muted-foreground">Mulai</dt>
-                <dd>{{ data.task.startedAt ? formatter.format(data.task.startedAt) : '—' }}</dd>
-                <dt class="text-muted-foreground">Selesai</dt>
-                <dd>{{ data.task.completedAt ? formatter.format(data.task.completedAt) : '—' }}</dd>
-                <dt class="text-muted-foreground">Percobaan</dt>
-                <dd>{{ data.task.attempts }} / {{ data.task.maxAttempts }}</dd>
-              </dl>
-            </CardContent>
-          </Card>
+          <GamePanel title="Instruksi" :icon="ScrollText">
+            <p class="whitespace-pre-line text-sm leading-relaxed" data-task-instruction>
+              {{ data.task.instruction }}
+            </p>
+            <Separator class="my-4" />
+            <dl>
+              <GameInfoRow label="AI employee">
+                <NuxtLink
+                  :to="`/agents/${data.task.agentId}`"
+                  class="inline-flex items-center gap-1 text-game-cyan hover:underline"
+                >
+                  <Bot class="size-3.5" aria-hidden="true" />{{ data.task.agentName }}
+                </NuxtLink>
+              </GameInfoRow>
+              <GameInfoRow label="Dibuat">{{ formatter.format(data.task.createdAt) }}</GameInfoRow>
+              <GameInfoRow label="Mulai">{{
+                data.task.startedAt ? formatter.format(data.task.startedAt) : '—'
+              }}</GameInfoRow>
+              <GameInfoRow label="Selesai">{{
+                data.task.completedAt ? formatter.format(data.task.completedAt) : '—'
+              }}</GameInfoRow>
+              <GameInfoRow label="Percobaan">{{ data.task.attempts }} / {{ data.task.maxAttempts }}</GameInfoRow>
+            </dl>
+          </GamePanel>
 
-          <Card class="glass">
-            <CardHeader>
-              <CardTitle class="font-heading">Run</CardTitle>
-              <CardDescription
-                >Setiap percobaan eksekusi (provider, model, status, pemakaian token bila dilaporkan).</CardDescription
-              >
-            </CardHeader>
-            <CardContent>
-              <ol class="space-y-2 text-sm" data-task-runs>
-                <li v-for="run in data.task.runs" :key="run.id" class="rounded-lg border border-border/60 p-3">
-                  <div class="flex items-center justify-between gap-2">
-                    <span class="font-medium">Percobaan {{ run.attempt }}</span>
-                    <span class="text-xs text-muted-foreground">{{ run.status }}</span>
-                  </div>
-                  <p class="text-xs text-muted-foreground">{{ run.runtimeProvider }} · {{ run.runtimeModel || '—' }}</p>
-                  <p v-if="run.usage" class="text-xs text-muted-foreground">
-                    token: {{ run.usage.inputTokens ?? '—' }} masuk · {{ run.usage.outputTokens ?? '—' }} keluar
-                  </p>
-                  <p v-if="run.errorMessage" class="text-xs text-destructive">
-                    {{ run.errorCode }} · {{ run.errorMessage }}
-                  </p>
-                </li>
-              </ol>
-            </CardContent>
-          </Card>
+          <GamePanel
+            title="Run"
+            description="Setiap percobaan eksekusi: provider, model, status, dan pemakaian token bila dilaporkan penyedia."
+            :icon="History"
+          >
+            <ol class="space-y-2 text-sm" data-task-runs>
+              <li v-for="run in data.task.runs" :key="run.id" class="game-panel game-panel-sunken p-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-medium">Percobaan {{ run.attempt }}</span>
+                  <span class="text-xs text-game-text-muted">{{ RUN_STATUS_LABELS[run.status] }}</span>
+                </div>
+                <p class="text-xs text-game-text-muted">{{ run.runtimeProvider }} · {{ run.runtimeModel || '—' }}</p>
+                <p v-if="run.usage" class="text-xs text-game-text-muted">
+                  token: {{ run.usage.inputTokens ?? '—' }} masuk · {{ run.usage.outputTokens ?? '—' }} keluar
+                </p>
+                <p v-if="run.errorMessage" class="text-xs text-destructive">
+                  {{ run.errorCode }} · {{ run.errorMessage }}
+                </p>
+              </li>
+            </ol>
+          </GamePanel>
         </div>
       </div>
     </template>

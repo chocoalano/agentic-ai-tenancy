@@ -29,8 +29,8 @@ const TONES = {
 <template>
   <div
     :class="[
-      'relative flex min-w-0 flex-col gap-3 rounded-xl p-4',
-      props.unavailable ? 'surface-sunken border-dashed' : 'surface-panel',
+      'game-panel relative flex min-w-0 flex-col gap-3 p-4',
+      props.unavailable ? 'game-panel-sunken border-dashed' : '',
     ]"
     :aria-disabled="props.unavailable ? 'true' : undefined"
   >

@@ -28,7 +28,10 @@ Worker eksekusi agent: `bun run worker` (atau `AI_WORKER_INLINE=true`); test khu
 5. Tanpa `any`, `@ts-ignore`, cast tidak aman, `v-html`, token di `localStorage`, secret di frontend.
 6. Frontend hanya `import type` dari `api/`; tipe data diturunkan dari `$api`.
 7. Schema respons mendeklarasikan status error; map status tanpa `as const`; timestamp `t.Date()`.
-8. Pakai primitive shadcn-vue; jangan menampilkan data palsu.
+8. Pakai primitive shadcn-vue; jangan menampilkan data palsu. Halaman terautentikasi non-office memakai Agentic Game
+   UI (`app/components/game`: GameShell/GameTopNav/GamePageHeader/GamePanel/GameTabs; token `--game-*`); jangan
+   kembali ke sidebar/kartu putih SaaS; tema gelap default, terang = varian game, preferensi pengguna dihormati
+   (`docs/unified-game-design-system.md`).
 9. Fitur tenant-scoped baru wajib disertai test isolasi.
 10. Jangan mengubah migrasi lama; buat file `db/migrations/NNNN_*.sql` baru.
 11. `/office` = game layar penuh (layout `game`). Artwork = PNG asli di `public/game-assets` (tidak diubah) + runtime

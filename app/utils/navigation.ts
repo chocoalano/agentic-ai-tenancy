@@ -16,6 +16,8 @@ export interface NavigationItem {
   status: 'available' | 'soon'
   /** Rilis yang direncanakan untuk modul `soon` (lihat docs/frontend-roadmap.md). */
   release?: string
+  /** Identitas area di dunia game (eyebrow header halaman, menu game). */
+  identity: string
 }
 
 export interface NavigationGroup {
@@ -31,6 +33,7 @@ export const NAVIGATION: NavigationGroup[] = [
     items: [
       {
         key: 'office',
+        identity: 'Interactive AI World',
         label: 'Virtual Office',
         description: 'Lantai kantor dan ringkasan operasional',
         icon: Building2,
@@ -39,6 +42,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         key: 'agents',
+        identity: 'AI Employee Headquarters',
         label: 'AI Employees',
         description: 'Direktori AI employee perusahaan',
         icon: Bot,
@@ -47,6 +51,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         key: 'tasks',
+        identity: 'Mission Board',
         label: 'Tugas',
         description: 'Riwayat tugas, run, hasil, dan persetujuan AI employee',
         icon: ListChecks,
@@ -55,6 +60,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         key: 'missions',
+        identity: 'Mission Control',
         label: 'Misi',
         description: 'Misi, XP, dan pencapaian',
         icon: Target,
@@ -69,6 +75,7 @@ export const NAVIGATION: NavigationGroup[] = [
     items: [
       {
         key: 'knowledge',
+        identity: 'Knowledge Library',
         label: 'Knowledge',
         description: 'Basis pengetahuan & dokumen',
         icon: BookOpen,
@@ -77,6 +84,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         key: 'integrations',
+        identity: 'Tools & Systems',
         label: 'Integrasi',
         description: 'Koneksi ke aplikasi bisnis',
         icon: Plug,
@@ -85,6 +93,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         key: 'analytics',
+        identity: 'Intelligence Center',
         label: 'Analitik',
         description: 'Kinerja dan penggunaan AI',
         icon: ChartLine,
@@ -99,6 +108,7 @@ export const NAVIGATION: NavigationGroup[] = [
     items: [
       {
         key: 'marketplace',
+        identity: 'Robot Marketplace',
         label: 'Marketplace',
         description: 'Rekrut AI employee siap pakai',
         icon: Store,
@@ -107,6 +117,7 @@ export const NAVIGATION: NavigationGroup[] = [
       },
       {
         key: 'billing',
+        identity: 'Resources & Subscriptions',
         label: 'Tagihan',
         description: 'Paket, kuota, dan faktur',
         icon: CreditCard,
@@ -119,6 +130,7 @@ export const NAVIGATION: NavigationGroup[] = [
 
 export const SETTINGS_NAVIGATION: NavigationItem = {
   key: 'settings',
+  identity: 'Commander Control Center',
   label: 'Pengaturan',
   description: 'Profil, perusahaan, tampilan, dan sesi',
   icon: Settings,
@@ -130,6 +142,15 @@ export const SETTINGS_NAVIGATION: NavigationItem = {
 export function availableNavigation(): NavigationItem[] {
   return [...NAVIGATION.flatMap((group) => group.items), SETTINGS_NAVIGATION].filter(
     (item) => item.status === 'available' && item.to,
+  )
+}
+
+/** Item navigasi yang aktif untuk path saat ini (termasuk Pengaturan), atau null. */
+export function activeNavigation(path: string): NavigationItem | null {
+  return (
+    [...NAVIGATION.flatMap((group) => group.items), SETTINGS_NAVIGATION].find((item) =>
+      isNavigationActive(item, path),
+    ) ?? null
   )
 }
 

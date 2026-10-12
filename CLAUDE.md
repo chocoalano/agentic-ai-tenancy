@@ -112,8 +112,18 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
 - Halaman harness khusus pengembangan di `app/dev/*.vue` (modul inline `devOnlyPages` di `nuxt.config.ts`, hanya saat
   `nuxt dev` → `/__dev/...`); jangan menaruhnya di `app/pages/`. Build production harus 404 (diuji e2e).
 - Primitive UI: gunakan shadcn-vue (`bunx shadcn-vue@2.8.2 add <komponen>`, style `new-york`). Jangan menulis
-  ulang primitive; komponen kustom hanya untuk domain (`app/components/{app,office,agents,shared}`).
-- Warna lewat token semantik (`bg-primary`, `text-agent-working`, `glass`, ...) di `app/assets/css/tailwind.css`.
+  ulang primitive; komponen kustom hanya untuk domain (`app/components/{app,office,agents,shared}`) dan chrome
+  sistem desain (`app/components/game`).
+- **Agentic Game UI** (satu produk, satu semesta): semua halaman terautentikasi non-office memakai layout `app` =
+  `GameShell` (latar `GamePageBackground`, navigasi atas `GameTopNav` dari `NAVIGATION`, `GameMenu` < 1280px) dan
+  komponen `GamePageHeader`/`GamePanel`/`GameTabs`/`GameInfoRow`/`GameLoadingState`; identitas area dari
+  `NavigationItem.identity` (mis. "Commander Control Center"). Jangan menghidupkan kembali sidebar/kartu putih SaaS,
+  jangan membuat modul palsu, kontrol yang belum didukung backend = `disabled` + alasan. Tema gelap = default
+  (dikalibrasi dari HUD /office); terang = varian siang dari sistem yang sama; preferensi pengguna tidak boleh ditimpa
+  otomatis; preferensi gerakan lewat `useUiPreferences` (cookie `aivo-motion`). Lihat
+  `docs/unified-game-design-system.md`, `docs/game-ui-component-library.md`.
+- Warna lewat token semantik (`bg-game-*`, `bg-primary`, `text-agent-working`, ...) di `app/assets/css/tailwind.css`;
+  token shadcn & brand adalah alias token `--game-*`. Tanpa warna hardcoded di komponen.
 - Zod di Vue SFC: `import * as z from 'zod'` (named import gagal di Vite SSR).
 - Jangan menampilkan data palsu (status runtime, progres, biaya). Fitur belum ada → empty/disabled state jujur.
 - `/office` = game layar penuh dengan layout `game` (tanpa sidebar/topbar; navigasi lewat menu game). Artwork = PNG

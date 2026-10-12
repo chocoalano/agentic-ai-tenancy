@@ -236,13 +236,17 @@ export function useOfficeEngine(options: { preview: Ref<boolean>; liveSpecs: Ref
     frameHandle = requestAnimationFrame(loop)
   }
 
+  // Kurangi gerakan: dari sistem operasi (media query) ATAU pengaturan pengguna (useUiPreferences).
+  const uiPreferences = useUiPreferences()
   let motion: MediaQueryList | null = null
-  const onMotionChange = (event: MediaQueryListEvent) => {
-    engine.reducedMotion = event.matches
+  const applyMotion = () => {
+    engine.reducedMotion = (motion?.matches ?? false) || uiPreferences.reducedMotion.value
   }
+  const onMotionChange = () => applyMotion()
+  watch(uiPreferences.reducedMotion, applyMotion)
   onMounted(() => {
     motion = window.matchMedia('(prefers-reduced-motion: reduce)')
-    engine.reducedMotion = motion.matches
+    applyMotion()
     motion.addEventListener('change', onMotionChange)
     windowStart = performance.now()
     frameHandle = requestAnimationFrame(loop)

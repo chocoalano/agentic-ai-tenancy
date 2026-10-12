@@ -69,7 +69,7 @@ async function go(path: string) {
   <div class="contents">
     <Button
       variant="ghost"
-      class="hidden h-10 w-full max-w-md justify-start gap-2.5 rounded-xl border border-hairline bg-surface-sunken/60 px-3 font-normal text-muted-foreground hover:bg-accent lg:flex"
+      class="hidden h-10 w-full max-w-md justify-start gap-2.5 rounded-xl border border-hairline bg-surface-sunken/60 px-3 font-normal text-muted-foreground hover:bg-accent 2xl:flex"
       aria-label="Cari AI employee atau halaman"
       aria-keyshortcuts="Meta+K Control+K"
       @click="open = true"
@@ -84,7 +84,7 @@ async function go(path: string) {
     <Button
       variant="ghost"
       size="icon"
-      class="size-10 rounded-xl md:size-9 lg:hidden"
+      class="size-10 rounded-xl md:size-9 2xl:hidden"
       aria-label="Cari AI employee atau halaman"
       @click="open = true"
     >

@@ -10,7 +10,7 @@ const unauthorized = computed(() => props.error?.statusCode === 401 || props.err
 </script>
 
 <template>
-  <Alert :variant="unauthorized ? 'default' : 'destructive'" class="glass">
+  <Alert :variant="unauthorized ? 'default' : 'destructive'" class="game-panel game-panel-warning">
     <Lock v-if="unauthorized" class="size-4" aria-hidden="true" />
     <CircleAlert v-else class="size-4" aria-hidden="true" />
     <AlertTitle>{{ unauthorized ? 'Akses ditolak' : 'Gagal memuat data' }}</AlertTitle>

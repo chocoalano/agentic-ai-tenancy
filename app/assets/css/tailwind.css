@@ -109,6 +109,21 @@
   --color-office-mint: var(--office-mint);
   --color-office-orange: var(--office-orange);
 
+  /* Agentic Game UI: token semantik lintas aplikasi (lihat docs/unified-game-design-system.md) */
+  --color-game-bg: var(--game-bg);
+  --color-game-bg-deep: var(--game-bg-deep);
+  --color-game-surface: var(--game-surface);
+  --color-game-surface-raised: var(--game-surface-raised);
+  --color-game-border: var(--game-border);
+  --color-game-border-strong: var(--game-border-strong);
+  --color-game-primary: var(--game-primary);
+  --color-game-cyan: var(--game-cyan);
+  --color-game-purple: var(--game-purple);
+  --color-game-orange: var(--game-orange);
+  --color-game-success: var(--game-success);
+  --color-game-text: var(--game-text);
+  --color-game-text-muted: var(--game-text-muted);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -116,28 +131,48 @@
   --radius-2xl: calc(var(--radius) + 8px);
 }
 
-/* Tema terang (opsional). Bingkai game Virtual Office tetap memakai tema gelap. */
+/*
+ * Tema TERANG = varian "siang" dari sistem game yang sama (bukan dashboard putih
+ * generik): permukaan biru pucat, aksen cyan/biru/ungu/oranye identik dengan HUD,
+ * kontras teks ≥ WCAG AA. Bingkai game /office tetap gelap.
+ */
 :root {
   --radius: 0.75rem;
 
-  --background: oklch(0.975 0.006 255);
-  --foreground: oklch(0.2 0.035 264);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.035 264);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.035 264);
-  --primary: oklch(0.52 0.2 260);
+  /* Agentic Game UI — varian terang */
+  --game-bg: oklch(0.955 0.016 250);
+  --game-bg-deep: oklch(0.905 0.03 252);
+  --game-surface: oklch(0.99 0.006 250);
+  --game-surface-raised: oklch(1 0 0);
+  --game-border: oklch(0.55 0.1 250 / 30%);
+  --game-border-strong: oklch(0.5 0.14 250 / 55%);
+  --game-primary: oklch(0.52 0.2 258);
+  --game-cyan: oklch(0.5 0.12 215);
+  --game-purple: oklch(0.5 0.2 300);
+  --game-orange: oklch(0.6 0.16 65);
+  --game-success: oklch(0.55 0.14 160);
+  --game-text: oklch(0.21 0.045 262);
+  --game-text-muted: oklch(0.45 0.04 258);
+  --game-glow: oklch(0.6 0.15 225 / 25%);
+
+  --background: var(--game-bg);
+  --foreground: var(--game-text);
+  --card: var(--game-surface);
+  --card-foreground: var(--game-text);
+  --popover: var(--game-surface-raised);
+  --popover-foreground: var(--game-text);
+  --primary: var(--game-primary);
   --primary-foreground: oklch(0.985 0.004 255);
-  --secondary: oklch(0.95 0.013 255);
-  --secondary-foreground: oklch(0.27 0.04 264);
-  --muted: oklch(0.95 0.01 255);
-  --muted-foreground: oklch(0.48 0.03 260);
-  --accent: oklch(0.935 0.022 250);
-  --accent-foreground: oklch(0.27 0.04 264);
+  --secondary: oklch(0.93 0.02 250);
+  --secondary-foreground: oklch(0.27 0.045 262);
+  --muted: oklch(0.925 0.018 250);
+  --muted-foreground: var(--game-text-muted);
+  --accent: oklch(0.9 0.035 240);
+  --accent-foreground: oklch(0.25 0.05 262);
   --destructive: oklch(0.55 0.22 25);
-  --border: oklch(0.89 0.016 255);
-  --input: oklch(0.89 0.016 255);
-  --ring: oklch(0.58 0.17 245);
+  --border: oklch(0.55 0.1 250 / 26%);
+  --input: oklch(0.55 0.1 250 / 32%);
+  --ring: oklch(0.56 0.15 225);
 
   --chart-1: oklch(0.55 0.2 260);
   --chart-2: oklch(0.6 0.12 210);
@@ -145,31 +180,32 @@
   --chart-4: oklch(0.68 0.16 60);
   --chart-5: oklch(0.6 0.14 160);
 
-  --sidebar: oklch(0.96 0.01 255);
-  --sidebar-foreground: oklch(0.25 0.035 264);
-  --sidebar-primary: oklch(0.52 0.2 260);
+  --sidebar: oklch(0.96 0.012 250);
+  --sidebar-foreground: oklch(0.25 0.04 262);
+  --sidebar-primary: var(--game-primary);
   --sidebar-primary-foreground: oklch(0.985 0.004 255);
-  --sidebar-accent: oklch(0.92 0.025 252);
+  --sidebar-accent: oklch(0.92 0.03 250);
   --sidebar-accent-foreground: oklch(0.22 0.04 264);
-  --sidebar-border: oklch(0.89 0.016 255);
-  --sidebar-ring: oklch(0.58 0.17 245);
+  --sidebar-border: oklch(0.55 0.1 250 / 26%);
+  --sidebar-ring: var(--ring);
 
-  --surface: oklch(1 0 0 / 74%);
-  --surface-1: oklch(1 0 0);
-  --surface-2: oklch(0.99 0.004 255);
-  --surface-sunken: oklch(0.955 0.01 255);
-  --glass-border: oklch(0.55 0.08 255 / 15%);
-  --hairline: oklch(0.55 0.05 255 / 12%);
+  --surface: oklch(0.995 0.004 250 / 78%);
+  --surface-1: var(--game-surface);
+  --surface-2: var(--game-surface-raised);
+  --surface-sunken: oklch(0.935 0.02 250);
+  --glass-border: oklch(0.5 0.12 240 / 22%);
+  --hairline: oklch(0.5 0.08 250 / 16%);
   --highlight: oklch(1 0 0 / 80%);
-  --glow: oklch(0.6 0.17 245 / 18%);
-  --grid-line: oklch(0.5 0.05 255 / 6%);
-  --shadow-panel: 0 1px 2px oklch(0.3 0.05 260 / 6%), 0 8px 24px -12px oklch(0.3 0.05 260 / 14%);
-  --shadow-elevated: 0 2px 4px oklch(0.3 0.05 260 / 8%), 0 24px 48px -20px oklch(0.3 0.06 260 / 28%);
+  --glow: var(--game-glow);
+  --grid-line: oklch(0.5 0.08 250 / 8%);
+  --shadow-panel: 0 1px 2px oklch(0.3 0.06 260 / 8%), 0 10px 28px -14px oklch(0.3 0.08 260 / 22%);
+  --shadow-elevated: 0 2px 4px oklch(0.3 0.05 260 / 8%), 0 24px 48px -20px oklch(0.3 0.06 260 / 30%);
 
-  --brand-blue: oklch(0.52 0.2 260);
-  --brand-cyan: oklch(0.6 0.12 215);
-  --brand-violet: oklch(0.52 0.18 295);
-  --brand-amber: oklch(0.66 0.16 62);
+  /* Brand = palet game (satu sumber warna aksen untuk seluruh aplikasi). */
+  --brand-blue: var(--game-primary);
+  --brand-cyan: var(--game-cyan);
+  --brand-violet: var(--game-purple);
+  --brand-amber: var(--game-orange);
 
   --success: oklch(0.56 0.14 160);
   --success-foreground: oklch(0.985 0.004 255);
@@ -209,26 +245,46 @@
   --office-orange: oklch(0.811 0.157 72); /* #ffae36 */
 }
 
-/* Tema gelap premium (default). */
+/*
+ * Tema GELAP (default) — dikalibrasi dari HUD Virtual Office (asset pack Neon
+ * Mission Map): navy #071329/#0a1936/#0e2448, garis #205a9e, aksen cyan #23d8ff,
+ * biru #267bff, ungu #a14bff, oranye #ffae36, mint #2ee8af.
+ */
 .dark {
-  --background: oklch(0.145 0.028 266);
-  --foreground: oklch(0.955 0.012 250);
-  --card: oklch(0.185 0.032 265);
-  --card-foreground: oklch(0.955 0.012 250);
-  --popover: oklch(0.19 0.034 265);
-  --popover-foreground: oklch(0.955 0.012 250);
-  --primary: oklch(0.66 0.19 256);
+  /* Agentic Game UI — varian gelap */
+  --game-bg: oklch(0.175 0.05 262);
+  --game-bg-deep: oklch(0.13 0.04 265);
+  --game-surface: oklch(0.225 0.062 262);
+  --game-surface-raised: oklch(0.27 0.072 260);
+  --game-border: oklch(0.467 0.125 255 / 55%);
+  --game-border-strong: oklch(0.6 0.13 240 / 75%);
+  --game-primary: oklch(0.609 0.212 260);
+  --game-cyan: oklch(0.816 0.141 218);
+  --game-purple: oklch(0.68 0.2 301);
+  --game-orange: oklch(0.811 0.157 72);
+  --game-success: oklch(0.83 0.163 166);
+  --game-text: oklch(0.965 0.012 250);
+  --game-text-muted: oklch(0.78 0.035 250);
+  --game-glow: oklch(0.816 0.141 218 / 28%);
+
+  --background: var(--game-bg);
+  --foreground: var(--game-text);
+  --card: var(--game-surface);
+  --card-foreground: var(--game-text);
+  --popover: var(--game-surface-raised);
+  --popover-foreground: var(--game-text);
+  --primary: var(--game-primary);
   --primary-foreground: oklch(0.985 0.004 255);
-  --secondary: oklch(0.245 0.036 264);
-  --secondary-foreground: oklch(0.93 0.012 250);
-  --muted: oklch(0.23 0.032 264);
-  --muted-foreground: oklch(0.72 0.03 255);
-  --accent: oklch(0.27 0.045 262);
-  --accent-foreground: oklch(0.955 0.012 250);
-  --destructive: oklch(0.65 0.2 22);
-  --border: oklch(0.85 0.05 250 / 11%);
-  --input: oklch(0.85 0.05 250 / 15%);
-  --ring: oklch(0.74 0.15 228);
+  --secondary: oklch(0.3 0.07 261);
+  --secondary-foreground: oklch(0.95 0.012 250);
+  --muted: oklch(0.27 0.06 262);
+  --muted-foreground: var(--game-text-muted);
+  --accent: oklch(0.31 0.08 258);
+  --accent-foreground: var(--game-text);
+  --destructive: oklch(0.66 0.2 22);
+  --border: oklch(0.467 0.125 255 / 45%);
+  --input: oklch(0.467 0.125 255 / 50%);
+  --ring: var(--game-cyan);
 
   --chart-1: oklch(0.66 0.19 256);
   --chart-2: oklch(0.8 0.13 205);
@@ -236,31 +292,32 @@
   --chart-4: oklch(0.78 0.16 62);
   --chart-5: oklch(0.75 0.15 160);
 
-  --sidebar: oklch(0.128 0.026 266);
-  --sidebar-foreground: oklch(0.9 0.014 250);
-  --sidebar-primary: oklch(0.66 0.19 256);
+  --sidebar: var(--game-bg-deep);
+  --sidebar-foreground: oklch(0.92 0.014 250);
+  --sidebar-primary: var(--game-primary);
   --sidebar-primary-foreground: oklch(0.985 0.004 255);
-  --sidebar-accent: oklch(0.22 0.042 263);
-  --sidebar-accent-foreground: oklch(0.97 0.01 250);
-  --sidebar-border: oklch(0.85 0.05 250 / 8%);
-  --sidebar-ring: oklch(0.74 0.15 228);
+  --sidebar-accent: oklch(0.27 0.065 261);
+  --sidebar-accent-foreground: var(--game-text);
+  --sidebar-border: oklch(0.467 0.125 255 / 35%);
+  --sidebar-ring: var(--game-cyan);
 
-  --surface: oklch(0.2 0.036 265 / 62%);
-  --surface-1: oklch(0.18 0.031 265);
-  --surface-2: oklch(0.215 0.036 265);
-  --surface-sunken: oklch(0.155 0.028 266);
-  --glass-border: oklch(0.88 0.06 235 / 12%);
-  --hairline: oklch(0.88 0.05 240 / 9%);
-  --highlight: oklch(0.95 0.04 230 / 7%);
-  --glow: oklch(0.7 0.17 240 / 30%);
-  --grid-line: oklch(0.8 0.08 235 / 5%);
-  --shadow-panel: 0 1px 0 oklch(0.95 0.04 230 / 4%) inset, 0 12px 32px -18px oklch(0.05 0.03 265 / 70%);
-  --shadow-elevated: 0 1px 0 oklch(0.95 0.04 230 / 6%) inset, 0 28px 60px -24px oklch(0.03 0.03 265 / 85%);
+  --surface: oklch(0.23 0.062 262 / 74%);
+  --surface-1: var(--game-surface);
+  --surface-2: var(--game-surface-raised);
+  --surface-sunken: oklch(0.15 0.045 264);
+  --glass-border: oklch(0.816 0.141 218 / 22%);
+  --hairline: oklch(0.6 0.12 245 / 28%);
+  --highlight: oklch(0.9 0.08 215 / 8%);
+  --glow: var(--game-glow);
+  --grid-line: oklch(0.75 0.1 230 / 7%);
+  --shadow-panel: 0 1px 0 oklch(0.95 0.06 215 / 6%) inset, 0 12px 32px -18px oklch(0.05 0.04 265 / 75%);
+  --shadow-elevated: 0 1px 0 oklch(0.95 0.06 215 / 8%) inset, 0 28px 60px -24px oklch(0.03 0.03 265 / 90%);
 
-  --brand-blue: oklch(0.66 0.19 256);
-  --brand-cyan: oklch(0.8 0.13 205);
-  --brand-violet: oklch(0.66 0.17 295);
-  --brand-amber: oklch(0.79 0.155 66);
+  /* Brand = palet game. */
+  --brand-blue: var(--game-primary);
+  --brand-cyan: var(--game-cyan);
+  --brand-violet: var(--game-purple);
+  --brand-amber: var(--game-orange);
 
   --success: oklch(0.76 0.15 160);
   --success-foreground: oklch(0.2 0.04 160);
@@ -469,6 +526,254 @@
   background-image: linear-gradient(90deg, var(--xp), var(--xp-to));
 }
 
+/* ---------------------------------------------------------------- *
+ * Agentic Game UI — chrome bersama halaman terautentikasi
+ * (latar, panel, navigasi, tab, crest, scrollbar). Semua dari token
+ * --game-*, berlaku untuk tema gelap maupun varian terang.
+ * ---------------------------------------------------------------- */
+
+/* Latar halaman: navy berlapis (gelap) / biru pucat (terang) + cahaya ambient. */
+@utility game-chrome-bg {
+  background-color: var(--game-bg);
+  background-image:
+    radial-gradient(70rem 36rem at 50% -12%, color-mix(in oklch, var(--game-purple) 20%, transparent), transparent 70%),
+    radial-gradient(52rem 30rem at 102% 100%, color-mix(in oklch, var(--game-cyan) 12%, transparent), transparent 70%),
+    radial-gradient(46rem 28rem at -4% 92%, color-mix(in oklch, var(--game-primary) 16%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--game-bg-deep), var(--game-bg) 38%, var(--game-bg));
+}
+
+/* Strip navigasi atas (turunan .office-hud): navy tembus pandang + garis bawah biru. */
+@utility game-topnav {
+  color: var(--game-text);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--game-surface-raised) 92%, transparent),
+    color-mix(in oklch, var(--game-surface) 86%, transparent)
+  );
+  border-bottom: 2px solid color-mix(in oklch, var(--game-border-strong) 80%, transparent);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 18%, transparent),
+    0 10px 30px -18px oklch(0.05 0.04 265 / 70%);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* Tautan modul di navigasi atas. */
+@utility game-nav-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-decoration: none;
+  color: var(--game-text-muted);
+  transition:
+    color 150ms ease,
+    background-color 150ms ease,
+    border-color 150ms ease;
+
+  &:hover {
+    color: var(--game-text);
+    background-color: color-mix(in oklch, var(--game-cyan) 9%, transparent);
+  }
+
+  &[data-active='true'] {
+    color: var(--game-cyan);
+    background-color: color-mix(in oklch, var(--game-cyan) 12%, transparent);
+    border-color: color-mix(in oklch, var(--game-cyan) 35%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 25%, transparent);
+  }
+
+  &[aria-disabled='true'] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+/* Panel dasar (pengganti kartu putih): permukaan game + garis tepi + sorotan atas. */
+@utility game-panel {
+  position: relative;
+  border-radius: var(--radius-xl);
+  color: var(--game-text);
+  background-color: var(--game-surface);
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in oklch, var(--game-surface-raised) 72%, transparent),
+    transparent 56%
+  );
+  border: 1px solid var(--game-border);
+  box-shadow: var(--shadow-panel);
+}
+
+@utility game-panel-elevated {
+  background-color: var(--game-surface-raised);
+  border-color: var(--game-border-strong);
+  box-shadow: var(--shadow-elevated);
+}
+
+/* Holografis: garis cyan + aksen sudut (turunan hud-panel). Untuk konten utama/sorotan. */
+@utility game-panel-holo {
+  border-color: color-mix(in oklch, var(--game-cyan) 45%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--game-cyan) 10%, transparent),
+    0 0 28px -10px var(--game-glow),
+    var(--shadow-panel);
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    pointer-events: none;
+    border-color: color-mix(in oklch, var(--game-cyan) 70%, transparent);
+  }
+
+  &::before {
+    top: -1px;
+    left: -1px;
+    border-top: 2px solid;
+    border-left: 2px solid;
+    border-top-left-radius: var(--radius-xl);
+  }
+
+  &::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 2px solid;
+    border-right: 2px solid;
+    border-bottom-right-radius: var(--radius-xl);
+  }
+}
+
+/* Pusat komando: panel hero (profil komandan, identitas agent). */
+@utility game-panel-command {
+  border: 2px solid color-mix(in oklch, var(--game-border-strong) 85%, var(--game-cyan));
+  background-image:
+    linear-gradient(160deg, color-mix(in oklch, var(--game-primary) 20%, var(--game-surface)), var(--game-surface) 62%),
+    radial-gradient(120% 60% at 0% 0%, color-mix(in oklch, var(--game-cyan) 16%, transparent), transparent 60%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 25%, transparent),
+    0 0 0 3px color-mix(in oklch, var(--game-primary) 10%, transparent),
+    var(--shadow-elevated);
+}
+
+@utility game-panel-warning {
+  border-color: color-mix(in oklch, var(--game-orange) 55%, transparent);
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in oklch, var(--game-orange) 12%, var(--game-surface)),
+    var(--game-surface) 70%
+  );
+}
+
+@utility game-panel-success {
+  border-color: color-mix(in oklch, var(--game-success) 50%, transparent);
+  background-image: linear-gradient(
+    160deg,
+    color-mix(in oklch, var(--game-success) 12%, var(--game-surface)),
+    var(--game-surface) 70%
+  );
+}
+
+/* Sumur: area bersarang (daftar, kode, pratinjau). */
+@utility game-panel-sunken {
+  background-color: var(--surface-sunken);
+  background-image: none;
+  border: 1px solid color-mix(in oklch, var(--game-border) 70%, transparent);
+  box-shadow: none;
+}
+
+/* Daftar tab pusat komando: baris transparan dengan garis dasar. */
+@utility game-tabs {
+  gap: 0.25rem;
+  height: auto;
+  padding: 0.25rem;
+  border-radius: 0.9rem;
+  background-color: color-mix(in oklch, var(--game-bg-deep) 70%, transparent);
+  border: 1px solid var(--game-border);
+  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 10%, transparent);
+}
+
+@utility game-tab {
+  height: 2.375rem;
+  gap: 0.5rem;
+  padding: 0 0.9rem;
+  border-radius: 0.65rem;
+  border: 1px solid transparent;
+  font-weight: 600;
+  color: var(--game-text-muted);
+
+  &:hover {
+    color: var(--game-text);
+  }
+
+  &[data-state='active'] {
+    color: var(--game-cyan);
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--game-cyan) 16%, transparent),
+      color-mix(in oklch, var(--game-primary) 14%, transparent)
+    );
+    border-color: color-mix(in oklch, var(--game-cyan) 40%, transparent);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 22%, transparent),
+      0 0 16px -6px var(--game-glow);
+  }
+}
+
+/*
+ * Crest heksagonal (identitas komandan/modul), turunan .commander-crest HUD.
+ * Cincin dibuat dengan bayangan inset (border biasa ikut terpotong clip-path);
+ * cahaya luar lewat pembungkus `game-crest-glow` (filter di luar klip).
+ */
+@utility game-crest {
+  display: grid;
+  place-items: center;
+  color: white;
+  font-weight: 800;
+  background: radial-gradient(
+    circle at 50% 40%,
+    color-mix(in oklch, var(--game-purple) 70%, black) 8%,
+    oklch(0.26 0.09 262) 70%
+  );
+  box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--game-cyan) 85%, white);
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+
+@utility game-crest-glow {
+  display: inline-grid;
+  filter: drop-shadow(0 0 10px var(--game-glow));
+}
+
+/* Chip status/metrik kecil di header halaman. */
+@utility game-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 1.75rem;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--game-text);
+  background-color: color-mix(in oklch, var(--game-surface-raised) 80%, transparent);
+  border: 1px solid var(--game-border);
+}
+
+/* Scrollbar bertema untuk area gulir di panel. */
+@utility game-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--game-cyan) 45%, transparent) transparent;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -501,7 +806,11 @@
   }
 }
 
-/* Hormati preferensi pengguna untuk mengurangi animasi. */
+/*
+ * Hormati preferensi mengurangi animasi: dari sistem operasi (media query) atau
+ * dari pengaturan pengguna di aplikasi (html[data-motion="reduced"], cookie
+ * `aivo-motion` — lihat composable useUiPreferences).
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -511,4 +820,13 @@
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

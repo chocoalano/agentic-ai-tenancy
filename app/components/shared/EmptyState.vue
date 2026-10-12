@@ -22,7 +22,7 @@ withDefaults(
 <template>
   <div
     :class="[
-      'relative flex flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-glass-border text-center',
+      'game-panel game-panel-sunken relative flex flex-col items-center justify-center overflow-hidden border-dashed text-center',
       size === 'compact' ? 'gap-2 px-4 py-6' : 'gap-3 px-6 py-10',
     ]"
   >

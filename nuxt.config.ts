@@ -36,6 +36,8 @@ export default defineNuxtConfig({
     { path: '~/components/office', pathPrefix: false },
     { path: '~/components/agents', pathPrefix: false },
     { path: '~/components/shared', pathPrefix: false },
+    // Agentic Game UI: chrome & panel bersama halaman terautentikasi (GameShell, GamePanel, ...).
+    { path: '~/components/game', pathPrefix: false },
   ],
 
   vite: {
@@ -92,6 +94,7 @@ export default defineNuxtConfig({
     '/office/**': { headers: { 'cache-control': 'private, no-store' } },
     '/agents/**': { headers: { 'cache-control': 'private, no-store' } },
     '/settings/**': { headers: { 'cache-control': 'private, no-store' } },
+    '/tasks/**': { headers: { 'cache-control': 'private, no-store' } },
     '/**': {
       headers: {
         'x-content-type-options': 'nosniff',

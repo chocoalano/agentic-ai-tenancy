@@ -1,14 +1,15 @@
 <script setup lang="ts">
+/**
+ * Layout publik (beranda, masuk, daftar, halaman error): latar game yang sama
+ * dengan halaman terautentikasi agar perpindahan masuk → kantor tidak terasa
+ * berganti produk.
+ */
 const auth = useAuth()
 </script>
 
 <template>
   <div class="relative min-h-dvh overflow-x-clip">
-    <div class="holo-aurora pointer-events-none absolute inset-0" aria-hidden="true" />
-    <div
-      class="holo-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black,transparent_70%)]"
-      aria-hidden="true"
-    />
+    <GamePageBackground />
     <a
       href="#konten"
       class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-background focus:px-3 focus:py-2"
