@@ -12,7 +12,7 @@ defineProps<{ agent: AgentSummary }>()
     data-agent-card
   >
     <div
-      class="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-game-cyan/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
+      class="pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent via-game-cyan/60 to-transparent opacity-0 transition-opacity group-hover:opacity-100"
       aria-hidden="true"
     />
     <CardHeader class="flex flex-row items-start gap-3 px-5">

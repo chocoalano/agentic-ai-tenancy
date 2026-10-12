@@ -191,7 +191,7 @@ const canDecide = computed(() => auth.can('approvals.decide'))
           </template>
           <pre
             v-if="data.output"
-            class="game-panel game-panel-sunken game-scrollbar max-h-[32rem] overflow-auto whitespace-pre-wrap p-4 text-sm leading-relaxed"
+            class="game-panel game-panel-sunken game-scrollbar max-h-128 overflow-auto whitespace-pre-wrap p-4 text-sm leading-relaxed"
             data-task-output
             >{{ data.output.content }}</pre>
           <p v-else class="type-support">Tidak ada konten untuk ditampilkan.</p>

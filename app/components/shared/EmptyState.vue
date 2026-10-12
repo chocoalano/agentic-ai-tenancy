@@ -31,7 +31,7 @@ withDefaults(
         <span class="size-7 shrink-0 rounded-lg bg-muted" />
         <span class="h-2 flex-1 rounded-full bg-muted" :style="{ maxWidth: `${88 - row * 14}%` }" />
       </div>
-      <div class="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-card" />
+      <div class="absolute inset-0 bg-linear-to-b from-transparent via-background/40 to-card" />
     </div>
     <div
       v-if="icon"

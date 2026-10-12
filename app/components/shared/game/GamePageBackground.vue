@@ -35,6 +35,6 @@ const skyline = computed(() => (failed.value && fallback ? fallback : MISSION_CI
     />
     <div class="holo-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black,transparent_72%)]" />
     <div class="office-stars absolute inset-x-0 top-0 h-[38vh] opacity-0 dark:opacity-60" />
-    <div class="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-game-bg-deep/60" />
+    <div class="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-game-bg-deep/60" />
   </div>
 </template>

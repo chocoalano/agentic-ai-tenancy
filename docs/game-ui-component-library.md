@@ -1,7 +1,7 @@
 # Pustaka Komponen Agentic Game UI
 
-Komponen chrome & panel bersama untuk halaman terautentikasi non-office, di `app/components/game/` (auto-import
-tanpa prefix folder; terdaftar di `nuxt.config.ts`). Semua memakai token `--game-*` dan primitive shadcn-vue;
+Komponen chrome & panel bersama untuk halaman terautentikasi non-office, di `app/components/shared/game/` (auto-import
+tanpa prefix folder lewat registrasi `~/components/shared` yang sudah ada). Semua memakai token `--game-*` dan primitive shadcn-vue;
 tidak ada warna hardcoded. Test: `tests/nuxt/game-ui.test.ts`.
 
 | Komponen             | Peran                                                                                                                                                                  | Prop utama                                                                                                                                                                                                                                   |

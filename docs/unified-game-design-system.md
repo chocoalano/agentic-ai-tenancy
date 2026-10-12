@@ -5,7 +5,7 @@ Tugas, Pengaturan) adalah area operasional lain di markas AI futuristik yang sam
 prinsip, token, arsitektur layout, tipografi, latar, dan kebijakan tema yang dipakai seluruh aplikasi.
 
 Sumber kode: token & utilitas di `app/assets/css/tailwind.css` (lapisan "Agentic Game UI"), komponen chrome di
-`app/components/game/`, layout `app/layouts/app.vue` (halaman manajemen) dan `app/layouts/game.vue` (/office),
+`app/components/shared/game/`, layout `app/layouts/app.vue` (halaman manajemen) dan `app/layouts/game.vue` (/office),
 identitas area di `app/utils/navigation.ts`. Pustaka komponen: `docs/game-ui-component-library.md`; inventaris rute:
 `docs/frontend-route-design-audit.md`; bukti QA: `docs/unified-frontend-visual-qa.md`.
 

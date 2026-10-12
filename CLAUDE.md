@@ -112,8 +112,8 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
 - Halaman harness khusus pengembangan di `app/dev/*.vue` (modul inline `devOnlyPages` di `nuxt.config.ts`, hanya saat
   `nuxt dev` → `/__dev/...`); jangan menaruhnya di `app/pages/`. Build production harus 404 (diuji e2e).
 - Primitive UI: gunakan shadcn-vue (`bunx shadcn-vue@2.8.2 add <komponen>`, style `new-york`). Jangan menulis
-  ulang primitive; komponen kustom hanya untuk domain (`app/components/{app,office,agents,shared}`) dan chrome
-  sistem desain (`app/components/game`).
+  ulang primitive; komponen kustom hanya untuk domain (`app/components/{app,office,agents,shared}`); chrome
+  sistem desain ada di `app/components/shared/game` (ikut registrasi `shared`, tanpa prefix).
 - **Agentic Game UI** (satu produk, satu semesta): semua halaman terautentikasi non-office memakai layout `app` =
   `GameShell` (latar `GamePageBackground`, navigasi atas `GameTopNav` dari `NAVIGATION`, `GameMenu` < 1280px) dan
   komponen `GamePageHeader`/`GamePanel`/`GameTabs`/`GameInfoRow`/`GameLoadingState`; identitas area dari

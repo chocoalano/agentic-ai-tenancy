@@ -22,7 +22,7 @@ import {
 import { useForm } from 'vee-validate'
 import { toast } from 'vue-sonner'
 import * as z from 'zod'
-import type { GameTabItem } from '~/components/game/GameTabs.vue'
+import type { GameTabItem } from '~/components/shared/game/GameTabs.vue'
 
 /*
  * /settings — Commander Control Center (referensi implementasi Agentic Game UI
@@ -421,7 +421,7 @@ const quickLinks = computed(() =>
                 <label
                   v-for="option in THEME_OPTIONS"
                   :key="option.value"
-                  class="game-panel relative flex cursor-pointer flex-col gap-2 p-4 transition has-[:checked]:game-panel-holo has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+                  class="game-panel relative flex cursor-pointer flex-col gap-2 p-4 transition has-checked:game-panel-holo has-focus-visible:ring-2 has-focus-visible:ring-ring"
                   :data-theme-option="option.value"
                 >
                   <input
@@ -454,7 +454,7 @@ const quickLinks = computed(() =>
                 <label
                   v-for="option in MOTION_OPTIONS"
                   :key="option.value"
-                  class="game-panel relative flex cursor-pointer flex-col gap-2 p-4 transition has-[:checked]:game-panel-holo has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+                  class="game-panel relative flex cursor-pointer flex-col gap-2 p-4 transition has-checked:game-panel-holo has-focus-visible:ring-2 has-focus-visible:ring-ring"
                   :data-motion-option="option.value"
                 >
                   <input

@@ -36,8 +36,6 @@ export default defineNuxtConfig({
     { path: '~/components/office', pathPrefix: false },
     { path: '~/components/agents', pathPrefix: false },
     { path: '~/components/shared', pathPrefix: false },
-    // Agentic Game UI: chrome & panel bersama halaman terautentikasi (GameShell, GamePanel, ...).
-    { path: '~/components/game', pathPrefix: false },
   ],
 
   vite: {
