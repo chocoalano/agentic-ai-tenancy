@@ -112,17 +112,19 @@ registry `~/utils/game-assets`) hanya di 46vh bawah, opasitas 12–20 %, blur 1.
 dengan mask radial → bintang (gelap saja) → gradien penutup. Panel konten hampir opak sehingga ilustrasi tidak pernah
 berada langsung di belakang teks padat. Tidak ada aset besar yang diduplikasi.
 
-## 6. Kebijakan tema
+## 6. Kebijakan tema: SATU identitas gelap
 
-- **Gelap = identitas game, default** (`colorMode.preference: 'dark'`, fallback gelap).
-- **Terang = varian siang yang didesain sengaja** dari sistem yang sama: permukaan biru pucat, aksen identik, chrome
-  identik. Bukan dashboard putih; tidak ada komponen yang "jatuh" ke gaya generik.
-- Preferensi pengguna disimpan @nuxtjs/color-mode (`aivo-color-mode`) dan **tidak pernah ditimpa** hanya dengan
-  membuka halaman; perubahan hanya lewat kontrol eksplisit (Pengaturan › Tampilan, toggle tema, menu pengguna).
-- /office selalu memakai bingkai gelap (kelas `dark` pada layout `game`) karena artwork malam-neon; GameMenu juga
-  gelap di mana pun dibuka (identitas menu game).
-- Tanpa kedipan SSR: kelas tema ditulis color-mode sebelum render; preferensi gerakan memakai **cookie**
-  (`aivo-motion`) sehingga atribut `html[data-motion]` sudah benar saat SSR.
+- Seluruh aplikasi (halaman manajemen, publik, dan /office) memakai **satu** identitas gelap HUD Virtual Office:
+  `GameShell`, layout `default`, dan layout `game` memaksa kelas `dark` pada bingkainya, dan halaman manajemen
+  memakai `definePageMeta({ colorMode: 'dark' })` seperti /office. Tidak ada mode terang terpisah — permintaan
+  produk: "semua UI mengikuti pola desain /office, jangan ada yang berbeda".
+- Pemilih tema dihapus dari navigasi, menu pengguna, dan Pengaturan › Tampilan (diganti pernyataan jujur).
+  Nilai `:root` (terang) di CSS hanya fallback aman untuk konteks tanpa kelas `dark`; tidak dipakai UI.
+- Preferensi gerakan tetap nyata (cookie `aivo-motion` → `html[data-motion]`, tanpa kedipan SSR).
+- Nilai HUD yang dipakai ulang persis (strip, kartu, crest, kepala panel, baris entri, sumur, ubin ikon) ada di
+  `app/assets/css/office-scene.css` sebagai utilitas `hud-*`, disalin dari CSS scoped `GameHUD.vue`,
+  `MissionPanel.vue`, dan `AgentRoster.vue`; `game-panel` = `hud-panel`, tombol shadcn = `game-btn-*`, badge =
+  gaya `OfficeStatusBadge`.
 
 ## 7. Gerakan
 

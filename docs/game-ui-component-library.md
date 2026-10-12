@@ -22,6 +22,19 @@ identitas dari navigasi), `StatCard` (panel game; `unavailable` → sumur putus-
 Tabs, Table, Tooltip, Popover, DropdownMenu, Sheet, Skeleton, Checkbox, Separator) dipakai apa adanya dan otomatis
 mengikuti token.
 
+## Utilitas HUD bersama (nilai identik dengan /office)
+
+| Utilitas                 | Sumber nilai                         | Dipakai oleh                                         |
+| ------------------------ | ------------------------------------ | ---------------------------------------------------- |
+| `hud-bar`                | `.office-hud` (GameHUD)              | GameTopNav, header layout publik                     |
+| `hud-card`               | `.hud-card` (GameHUD)                | StatCard, kartu komandan (TenantSwitcher `hud`)      |
+| `hud-crest`/`game-crest` | `.commander-crest` (GameHUD)         | kartu komandan, header halaman, profil               |
+| `hud-heading`            | `.mission-heading`/`.roster-heading` | GamePanel, GamePageHeader                            |
+| `hud-row`                | `.roster-entry` (AgentRoster)        | AgentCard, daftar tugas, daftar perusahaan           |
+| `hud-well`               | blok kosong roster                   | EmptyState, GameLoadingState, varian `sunken`        |
+| `hud-tile`               | `.tool-tile` (GameCommandBar)        | ikon empty state, item pemilih tenant                |
+| `game-btn-*`             | tombol dunia /office                 | varian Button shadcn (default/secondary/destructive) |
+
 ## Kapan memakai varian `GamePanel`
 
 | Varian     | Pakai untuk                                                      | Jangan untuk          |

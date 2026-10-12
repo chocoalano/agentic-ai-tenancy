@@ -6,7 +6,6 @@ import {
   Check,
   Gauge,
   KeyRound,
-  Laptop,
   ListChecks,
   Loader2,
   LogOut,
@@ -14,7 +13,6 @@ import {
   Palette,
   Plus,
   ShieldCheck,
-  Sun,
   UserRound,
   Zap,
   ZapOff,
@@ -29,14 +27,13 @@ import type { GameTabItem } from '~/components/shared/game/GameTabs.vue'
  * untuk halaman non-office). Semua data dari sesi/API; kontrol yang belum
  * didukung backend ditampilkan nonaktif dengan alasan, bukan input palsu.
  */
-definePageMeta({ layout: 'app', middleware: 'auth', title: 'Pengaturan' })
+definePageMeta({ layout: 'app', middleware: 'auth', title: 'Pengaturan', colorMode: 'dark' })
 useHead({ title: 'Pengaturan' })
 
 const route = useRoute()
 const router = useRouter()
 const { $api } = useNuxtApp()
 const auth = useAuth()
-const colorMode = useColorMode()
 const uiPreferences = useUiPreferences()
 
 const TABS = ['profile', 'company', 'appearance', 'session'] as const
@@ -131,31 +128,6 @@ const createCompany = companyForm.handleSubmit(async (values) => {
 })
 
 // --- Tampilan ---------------------------------------------------------------
-const THEME_OPTIONS = [
-  {
-    value: 'dark',
-    label: 'Gelap · identitas game',
-    description: 'Navy neon seperti HUD Virtual Office. Direkomendasikan.',
-    icon: Moon,
-  },
-  {
-    value: 'light',
-    label: 'Terang · varian siang',
-    description: 'Palet biru pucat dengan aksen dan tata letak yang sama.',
-    icon: Sun,
-  },
-  { value: 'system', label: 'Ikuti sistem', description: 'Mengikuti preferensi sistem operasi.', icon: Laptop },
-] as const
-function setTheme(value: string) {
-  const option = THEME_OPTIONS.find((item) => item.value === value)
-  if (option) colorMode.preference = option.value
-}
-// Preferensi tema hanya diketahui di klien (localStorage); status radio diisi setelah mount agar SSR & hidrasi cocok.
-const themeReady = ref(false)
-onMounted(() => {
-  themeReady.value = true
-})
-const isTheme = (value: string) => themeReady.value && colorMode.preference === value
 const MOTION_OPTIONS = [
   {
     value: 'system',
@@ -373,7 +345,7 @@ const quickLinks = computed(() =>
               <li
                 v-for="membership in auth.memberships.value"
                 :key="membership.tenant.id"
-                class="flex items-center gap-3 py-3"
+                class="hud-row my-1.5 flex items-center gap-3 px-3 py-2.5"
               >
                 <span
                   class="grid size-9 shrink-0 place-items-center rounded-lg bg-game-primary/15 text-xs font-bold text-game-cyan ring-1 ring-inset ring-game-border"
@@ -412,39 +384,19 @@ const quickLinks = computed(() =>
           <GamePanel
             variant="holo"
             title="Tema"
-            description="Identitas game gelap adalah default; pilihan disimpan di perangkat ini dan tidak diubah tanpa tindakan Anda."
+            description="Satu identitas visual untuk seluruh aplikasi — sama dengan Virtual Office."
             :icon="Palette"
+            data-theme-panel
           >
-            <fieldset>
-              <legend class="sr-only">Mode warna</legend>
-              <div class="grid gap-3 sm:grid-cols-3">
-                <label
-                  v-for="option in THEME_OPTIONS"
-                  :key="option.value"
-                  class="game-panel relative flex cursor-pointer flex-col gap-2 p-4 transition has-checked:game-panel-holo has-focus-visible:ring-2 has-focus-visible:ring-ring"
-                  :data-theme-option="option.value"
-                >
-                  <input
-                    type="radio"
-                    name="theme"
-                    class="sr-only"
-                    :value="option.value"
-                    :checked="isTheme(option.value)"
-                    @change="setTheme(option.value)"
-                  />
-                  <span class="flex items-center gap-2 text-sm font-semibold">
-                    <component :is="option.icon" class="size-4 text-game-cyan" aria-hidden="true" />
-                    {{ option.label }}
-                    <Check v-if="isTheme(option.value)" class="ml-auto size-4 text-game-cyan" aria-hidden="true" />
-                  </span>
-                  <span class="type-support">{{ option.description }}</span>
-                </label>
-              </div>
-            </fieldset>
-            <p class="type-support mt-3 text-xs">
-              Virtual Office selalu memakai bingkai gelap karena artwork bernuansa malam-neon; halaman lain mengikuti
-              pilihan di atas.
-            </p>
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="game-chip"
+                ><Moon class="size-3.5 text-office-cyan" aria-hidden="true" />Gelap · identitas game</span
+              >
+              <p class="text-[13px] text-blue-100">
+                Navy neon seperti HUD Virtual Office dipakai di semua halaman; tidak ada mode terang terpisah agar tidak
+                ada dua bahasa visual.
+              </p>
+            </div>
           </GamePanel>
 
           <GamePanel title="Gerakan" description="Berlaku untuk animasi ambient, transisi, dan mesin game." :icon="Zap">

@@ -118,9 +118,11 @@ Sebelum menyatakan pekerjaan selesai: `typecheck`, `lint`, `format:check`, `chec
   `GameShell` (latar `GamePageBackground`, navigasi atas `GameTopNav` dari `NAVIGATION`, `GameMenu` < 1280px) dan
   komponen `GamePageHeader`/`GamePanel`/`GameTabs`/`GameInfoRow`/`GameLoadingState`; identitas area dari
   `NavigationItem.identity` (mis. "Commander Control Center"). Jangan menghidupkan kembali sidebar/kartu putih SaaS,
-  jangan membuat modul palsu, kontrol yang belum didukung backend = `disabled` + alasan. Tema gelap = default
-  (dikalibrasi dari HUD /office); terang = varian siang dari sistem yang sama; preferensi pengguna tidak boleh ditimpa
-  otomatis; preferensi gerakan lewat `useUiPreferences` (cookie `aivo-motion`). Lihat
+  jangan membuat modul palsu, kontrol yang belum didukung backend = `disabled` + alasan. SATU identitas gelap
+  HUD /office untuk seluruh aplikasi (tanpa mode terang; `GameShell`/layout memaksa `dark`, halaman manajemen memakai
+  `colorMode: 'dark'`); nilai HUD dipakai ulang lewat utilitas `hud-*` (office-scene.css), `game-panel` = `hud-panel`,
+  Button/Badge shadcn = `game-btn-*`/gaya `OfficeStatusBadge`; preferensi gerakan lewat `useUiPreferences` (cookie
+  `aivo-motion`). Lihat
   `docs/unified-game-design-system.md`, `docs/game-ui-component-library.md`.
 - Warna lewat token semantik (`bg-game-*`, `bg-primary`, `text-agent-working`, ...) di `app/assets/css/tailwind.css`;
   token shadcn & brand adalah alias token `--game-*`. Tanpa warna hardcoded di komponen.

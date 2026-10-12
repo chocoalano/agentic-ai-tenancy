@@ -1,23 +1,11 @@
 <script setup lang="ts">
-import { Laptop, LogOut, Moon, Settings, Sun, UserRound } from '@lucide/vue'
+import { LogOut, Settings, UserRound } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 const auth = useAuth()
-const colorMode = useColorMode()
 const loggingOut = ref(false)
 const initials = computed(() => initialsOf(auth.user.value?.displayName ?? '?'))
 const roleLabel = computed(() => auth.activeTenant.value?.roles.join(', ') ?? 'Tanpa perusahaan aktif')
-
-const themes = [
-  { value: 'dark', label: 'Gelap', icon: Moon },
-  { value: 'light', label: 'Terang', icon: Sun },
-  { value: 'system', label: 'Ikuti sistem', icon: Laptop },
-] as const
-
-function onThemeChange(value: unknown) {
-  const theme = themes.find((item) => item.value === value)
-  if (theme) colorMode.preference = theme.value
-}
 
 async function logout() {
   loggingOut.value = true
@@ -63,17 +51,6 @@ async function logout() {
       <DropdownMenuItem as-child>
         <NuxtLink to="/settings"><Settings class="size-4" aria-hidden="true" />Pengaturan</NuxtLink>
       </DropdownMenuItem>
-      <!-- Tema di menu pengguna untuk layar kecil (tombol tema topbar disembunyikan di bawah sm). -->
-      <div class="sm:hidden">
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel class="text-xs text-muted-foreground">Tema</DropdownMenuLabel>
-        <DropdownMenuRadioGroup :model-value="colorMode.preference" @update:model-value="onThemeChange">
-          <DropdownMenuRadioItem v-for="theme in themes" :key="theme.value" :value="theme.value">
-            <component :is="theme.icon" class="size-4" aria-hidden="true" />
-            {{ theme.label }}
-          </DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </div>
       <DropdownMenuSeparator />
       <DropdownMenuItem variant="destructive" :disabled="loggingOut" @select="logout">
         <LogOut class="size-4" aria-hidden="true" />

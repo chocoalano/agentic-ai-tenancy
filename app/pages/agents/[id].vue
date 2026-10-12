@@ -8,7 +8,7 @@ import { isAgentAssignable } from '~~/domains/agents/types'
  * dan aksi yang benar-benar didukung backend (penugasan lewat Virtual Office
  * bila runtime tersedia). Tidak ada metrik/kemampuan karangan.
  */
-definePageMeta({ layout: 'app', middleware: 'auth', title: 'Detail AI Employee' })
+definePageMeta({ layout: 'app', middleware: 'auth', title: 'Detail AI Employee', colorMode: 'dark' })
 
 const route = useRoute()
 const { $api } = useNuxtApp()
@@ -167,10 +167,7 @@ const currentTask = computed(() => {
             />
             <ul v-else class="divide-y divide-game-border/60">
               <li v-for="task in data.tasks" :key="task.id">
-                <NuxtLink
-                  :to="`/tasks/${task.id}`"
-                  class="flex items-center gap-3 rounded-lg px-1 py-2.5 transition-colors hover:bg-game-cyan/8"
-                >
+                <NuxtLink :to="`/tasks/${task.id}`" class="hud-row my-1.5 flex items-center gap-3 px-3 py-2.5">
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-sm font-medium">{{ task.title }}</p>
                     <p class="truncate text-xs text-game-text-muted">

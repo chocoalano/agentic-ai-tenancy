@@ -127,6 +127,150 @@
   background-image: linear-gradient(180deg, oklch(0.36 0.1 258), oklch(0.26 0.08 262));
 }
 
+/* ---------------------------------------------------------------- *
+ * HUD bersama — nilai IDENTIK dengan CSS scoped GameHUD.vue (.office-hud,
+ * .hud-card, .commander-crest, .commander-track), MissionPanel.vue
+ * (.mission-heading, .sector-heading) dan AgentRoster.vue (.roster-entry,
+ * blok kosong), agar halaman manajemen memakai pola yang sama persis.
+ * ---------------------------------------------------------------- */
+
+/* Strip HUD atas (= .office-hud). */
+@utility hud-bar {
+  color: #f5f8ff;
+  background: linear-gradient(180deg, #081d4dde, #123771a8 82%, transparent);
+  border-bottom: 2px solid #567cff94;
+}
+
+/* Kartu HUD (= .hud-card): bingkai ganda + tepi bawah 3D. */
+@utility hud-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 12px;
+  color: #f5f8ff;
+  border: 1px solid #658cdb8a;
+  border-radius: 14px;
+  background: linear-gradient(160deg, #102b60, #061738 76%);
+  box-shadow:
+    inset 0 0 0 3px #1d3a675c,
+    0 3px 0 #03102b8c;
+}
+
+/* Kartu HUD aktif/terpilih: bingkai cyan bercahaya. */
+@utility hud-card-active {
+  border-color: #76f3ff;
+  box-shadow:
+    inset 0 0 0 3px #23d8ff33,
+    0 3px 0 #03102b8c,
+    0 0 14px #23d8ff55;
+}
+
+/* Crest heksagonal (= .commander-crest). */
+@utility hud-crest {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  color: white;
+  font-weight: 800;
+  background: radial-gradient(circle, #8539b5 12%, #102757 64%);
+  border: 2px solid #76f3ff;
+  clip-path: polygon(50% 0, 91% 20%, 100% 68%, 65% 100%, 21% 91%, 0 50%, 13% 13%);
+  filter: drop-shadow(0 0 8px #2ae9ff);
+}
+
+/* Track progres HUD (= .commander-track). */
+@utility hud-track-xp {
+  overflow: hidden;
+  border: 1px solid #779dd08c;
+  border-radius: 99px;
+  background: #1d3154;
+  box-shadow: inset 0 2px 3px #030d29b3;
+}
+
+/* Kepala panel (= .mission-heading / .roster-heading). */
+@utility hud-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 12px;
+  color: #f5f8ff;
+  border-bottom: 1px solid #6288cb5c;
+}
+
+/* Sub-kepala panel (= .sector-heading). */
+@utility hud-subheading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border-bottom: 1px solid #6288cb5c;
+  background: #071a3d80;
+}
+
+/* Baris entri (= .roster-entry). */
+@utility hud-row {
+  position: relative;
+  border-radius: 0.75rem;
+  border: 1px solid oklch(0.62 0.17 255 / 35%);
+  background: linear-gradient(135deg, #112b54, #0a1938);
+  box-shadow: inset 0 1px 0 #72b5ff0d;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+
+  &:hover {
+    border-color: color-mix(in oklch, var(--office-cyan) 60%, transparent);
+  }
+
+  &[data-selected='true'] {
+    border-color: var(--office-cyan);
+    background: color-mix(in oklch, var(--office-cyan) 15%, transparent);
+    box-shadow: 0 0 16px oklch(0.8 0.14 215 / 30%);
+  }
+}
+
+/* Sumur/blok kosong (= blok "0 AI employee" roster). */
+@utility hud-well {
+  border-radius: 0.75rem;
+  border: 1px dashed color-mix(in oklch, var(--office-cyan) 35%, transparent);
+  background: oklch(0.16 0.05 266 / 70%);
+}
+
+/* Ubin ikon (= .tool-tile command dock). */
+@utility hud-tile {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  border: 1px solid #436bb0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #18386b, #0a1a39);
+  box-shadow:
+    inset 0 1px 0 #ffffff14,
+    0 2px 0 #03102b8c;
+}
+
+/* Tombol ikon HUD (= tombol ghost di .hud-actions). */
+@utility hud-icon-btn {
+  color: oklch(0.8 0.12 255);
+  border-radius: 0.5rem;
+  transition: color 150ms ease;
+
+  &:hover {
+    color: var(--office-cyan);
+  }
+}
+
+@utility game-btn-red {
+  background-image: linear-gradient(180deg, oklch(0.66 0.2 25), oklch(0.5 0.2 22));
+}
+
+@utility game-btn-orange {
+  color: oklch(0.2 0.05 70);
+  background-image: linear-gradient(180deg, oklch(0.84 0.16 72), oklch(0.72 0.17 60));
+}
+
 /* Tepi lembut sel scene agar pulau saat zoom tidak terpotong tajam. */
 @utility office-scene-mask {
   mask-image:

@@ -30,7 +30,7 @@ Worker eksekusi agent: `bun run worker` (atau `AI_WORKER_INLINE=true`); test khu
 7. Schema respons mendeklarasikan status error; map status tanpa `as const`; timestamp `t.Date()`.
 8. Pakai primitive shadcn-vue; jangan menampilkan data palsu. Halaman terautentikasi non-office memakai Agentic Game
    UI (`app/components/shared/game`: GameShell/GameTopNav/GamePageHeader/GamePanel/GameTabs; token `--game-*`); jangan
-   kembali ke sidebar/kartu putih SaaS; tema gelap default, terang = varian game, preferensi pengguna dihormati
+   kembali ke sidebar/kartu putih SaaS; satu identitas gelap HUD /office tanpa mode terang; utilitas `hud-*` dipakai ulang
    (`docs/unified-game-design-system.md`).
 9. Fitur tenant-scoped baru wajib disertai test isolasi.
 10. Jangan mengubah migrasi lama; buat file `db/migrations/NNNN_*.sql` baru.

@@ -2,39 +2,32 @@
 import { BACKGROUNDS, MISSION_CITY_BACKGROUND, v2Source } from '~/utils/game-assets'
 
 /**
- * Latar bersama semua halaman terautentikasi (Agentic Game UI): gradien navy
- * berlapis (varian terang: biru pucat), kota Mission Map yang diredupkan &
- * diburamkan di tepi bawah (aset yang sama dengan /office → kontinuitas
- * visual), grid holografik halus, dan bintang (hanya tema gelap).
- *
- * Ilustrasi sengaja sangat redup dan dimask agar tidak pernah berada "di
- * belakang" teks padat: panel konten memakai permukaan hampir opak.
+ * Latar halaman manajemen = latar Virtual Office (GameBackdrop): langit
+ * `game-sky`, ilustrasi kota Mission Map yang sama (registry aset), vinyet
+ * HUD `game-vignette`, lalu peredup agar panel HUD tembus pandang (blur) dan
+ * teks tetap terbaca. Tidak ada aset yang diduplikasi.
  */
 const failed = ref(false)
 const fallback = v2Source(BACKGROUNDS['city-skyline'])
-const skyline = computed(() => (failed.value && fallback ? fallback : MISSION_CITY_BACKGROUND))
+const source = computed(() => (failed.value && fallback ? fallback : MISSION_CITY_BACKGROUND))
 </script>
 
 <template>
-  <div
-    class="game-chrome-bg pointer-events-none fixed inset-0 z-0 overflow-hidden"
-    aria-hidden="true"
-    data-game-background
-  >
+  <div class="game-sky pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden="true" data-game-background>
     <img
-      :src="skyline.src"
-      :width="skyline.width"
-      :height="skyline.height"
+      :src="source.src"
+      :width="source.width"
+      :height="source.height"
       alt=""
-      class="absolute inset-x-0 bottom-0 h-[46vh] w-full object-cover object-top opacity-[0.12] blur-[1.5px] [mask-image:linear-gradient(180deg,transparent,black_60%)] dark:opacity-[0.2]"
+      class="absolute inset-0 size-full object-cover object-center"
       loading="lazy"
       decoding="async"
       draggable="false"
       data-asset="backgrounds/mission-city"
       @error="failed = true"
     />
-    <div class="holo-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top,black,transparent_72%)]" />
-    <div class="office-stars absolute inset-x-0 top-0 h-[38vh] opacity-0 dark:opacity-60" />
-    <div class="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-game-bg-deep/60" />
+    <div class="game-vignette absolute inset-0" />
+    <div class="absolute inset-0 bg-[oklch(0.1_0.05_266/58%)]" />
+    <div class="office-stars absolute inset-x-0 top-0 h-[36vh] opacity-60" />
   </div>
 </template>

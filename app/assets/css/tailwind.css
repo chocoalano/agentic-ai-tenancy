@@ -132,9 +132,10 @@
 }
 
 /*
- * Tema TERANG = varian "siang" dari sistem game yang sama (bukan dashboard putih
- * generik): permukaan biru pucat, aksen cyan/biru/ungu/oranye identik dengan HUD,
- * kontras teks ≥ WCAG AA. Bingkai game /office tetap gelap.
+ * Nilai :root (terang) TIDAK dipakai antarmuka aplikasi: identitas game selalu
+ * gelap (GameShell, layout game, layout publik memaksa kelas `dark`), sama
+ * dengan Virtual Office. Dipertahankan hanya sebagai fallback aman bila ada
+ * konteks tanpa kelas `dark` (mis. cetak/email di masa depan).
  */
 :root {
   --radius: 0.75rem;
@@ -263,8 +264,8 @@
   --game-purple: oklch(0.68 0.2 301);
   --game-orange: oklch(0.811 0.157 72);
   --game-success: oklch(0.83 0.163 166);
-  --game-text: oklch(0.965 0.012 250);
-  --game-text-muted: oklch(0.78 0.035 250);
+  --game-text: oklch(0.975 0.008 250); /* #f5f8ff (teks HUD) */
+  --game-text-muted: oklch(0.83 0.045 252); /* ≈ blue-200 (label HUD) */
   --game-glow: oklch(0.816 0.141 218 / 28%);
 
   --background: var(--game-bg);
@@ -282,8 +283,8 @@
   --accent: oklch(0.31 0.08 258);
   --accent-foreground: var(--game-text);
   --destructive: oklch(0.66 0.2 22);
-  --border: oklch(0.467 0.125 255 / 45%);
-  --input: oklch(0.467 0.125 255 / 50%);
+  --border: oklch(0.62 0.12 258 / 36%); /* #6288cb5c (garis kepala panel HUD) */
+  --input: oklch(0.45 0.1 258 / 55%);
   --ring: var(--game-cyan);
 
   --chart-1: oklch(0.66 0.19 256);
@@ -532,63 +533,63 @@
  * --game-*, berlaku untuk tema gelap maupun varian terang.
  * ---------------------------------------------------------------- */
 
-/* Latar halaman: navy berlapis (gelap) / biru pucat (terang) + cahaya ambient. */
+/* Latar halaman fallback (di bawah ilustrasi dunia Mission Map). */
 @utility game-chrome-bg {
-  background-color: var(--game-bg);
-  background-image:
-    radial-gradient(70rem 36rem at 50% -12%, color-mix(in oklch, var(--game-purple) 20%, transparent), transparent 70%),
-    radial-gradient(52rem 30rem at 102% 100%, color-mix(in oklch, var(--game-cyan) 12%, transparent), transparent 70%),
-    radial-gradient(46rem 28rem at -4% 92%, color-mix(in oklch, var(--game-primary) 16%, transparent), transparent 70%),
-    linear-gradient(180deg, var(--game-bg-deep), var(--game-bg) 38%, var(--game-bg));
+  background-color: var(--office-bg);
 }
 
-/* Strip navigasi atas (turunan .office-hud): navy tembus pandang + garis bawah biru. */
+/* Strip navigasi atas = .office-hud (lihat hud-bar). */
 @utility game-topnav {
-  color: var(--game-text);
-  background-image: linear-gradient(
-    180deg,
-    color-mix(in oklch, var(--game-surface-raised) 92%, transparent),
-    color-mix(in oklch, var(--game-surface) 86%, transparent)
-  );
-  border-bottom: 2px solid color-mix(in oklch, var(--game-border-strong) 80%, transparent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 18%, transparent),
-    0 10px 30px -18px oklch(0.05 0.04 265 / 70%);
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  color: #f5f8ff;
+  background: linear-gradient(180deg, #081d4dde, #123771a8 82%, transparent);
+  border-bottom: 2px solid #567cff94;
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 
-/* Tautan modul di navigasi atas. */
+/* Tab modul di strip HUD = kartu HUD kecil (.hud-card) dengan ikon bercahaya. */
 @utility game-nav-link {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  height: 2.5rem;
-  padding: 0 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid transparent;
-  font-size: 0.875rem;
-  font-weight: 600;
-  white-space: nowrap;
+  height: 2.75rem;
+  padding: 0 0.8rem;
+  min-width: 0;
   flex-shrink: 0;
+  white-space: nowrap;
   text-decoration: none;
-  color: var(--game-text-muted);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: oklch(0.9 0.04 250);
+  border: 1px solid #658cdb8a;
+  border-radius: 12px;
+  background: linear-gradient(160deg, #102b60, #061738 76%);
+  box-shadow:
+    inset 0 0 0 2px #1d3a675c,
+    0 3px 0 #03102b8c;
   transition:
     color 150ms ease,
-    background-color 150ms ease,
-    border-color 150ms ease;
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+
+  & svg {
+    color: var(--office-cyan);
+    filter: drop-shadow(0 0 6px var(--office-cyan));
+  }
 
   &:hover {
-    color: var(--game-text);
-    background-color: color-mix(in oklch, var(--game-cyan) 9%, transparent);
+    color: white;
+    border-color: color-mix(in oklch, var(--office-cyan) 60%, transparent);
   }
 
   &[data-active='true'] {
-    color: var(--game-cyan);
-    background-color: color-mix(in oklch, var(--game-cyan) 12%, transparent);
-    border-color: color-mix(in oklch, var(--game-cyan) 35%, transparent);
-    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 25%, transparent);
+    color: var(--office-cyan);
+    border-color: #76f3ff;
+    box-shadow:
+      inset 0 0 0 2px #23d8ff33,
+      0 3px 0 #03102b8c,
+      0 0 14px #23d8ff55;
   }
 
   &[aria-disabled='true'] {
@@ -597,34 +598,25 @@
   }
 }
 
-/* Panel dasar (pengganti kartu putih): permukaan game + garis tepi + sorotan atas. */
+/*
+ * Panel = .hud-panel Virtual Office (navy tembus pandang, garis biru 2px,
+ * aksen sudut, blur). Nilai disalin apa adanya dari office-scene.css.
+ */
 @utility game-panel {
   position: relative;
-  border-radius: var(--radius-xl);
-  color: var(--game-text);
-  background-color: var(--game-surface);
-  background-image: linear-gradient(
-    160deg,
-    color-mix(in oklch, var(--game-surface-raised) 72%, transparent),
-    transparent 56%
-  );
-  border: 1px solid var(--game-border);
-  box-shadow: var(--shadow-panel);
-}
-
-@utility game-panel-elevated {
-  background-color: var(--game-surface-raised);
-  border-color: var(--game-border-strong);
-  box-shadow: var(--shadow-elevated);
-}
-
-/* Holografis: garis cyan + aksen sudut (turunan hud-panel). Untuk konten utama/sorotan. */
-@utility game-panel-holo {
-  border-color: color-mix(in oklch, var(--game-cyan) 45%, transparent);
+  border-radius: 1rem;
+  color: #f5f8ff;
+  background-image:
+    linear-gradient(160deg, oklch(0.3 0.09 262 / 88%), oklch(0.17 0.06 266 / 90%) 60%),
+    radial-gradient(120% 60% at 0% 0%, oklch(0.8 0.14 215 / 14%), transparent 60%);
+  border: 2px solid color-mix(in oklch, var(--office-border) 65%, white);
   box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--game-cyan) 10%, transparent),
-    0 0 28px -10px var(--game-glow),
-    var(--shadow-panel);
+    0 0 0 1px oklch(0.2 0.08 265 / 70%),
+    0 0 12px oklch(0.6 0.15 250 / 18%),
+    inset 0 1px 0 oklch(0.95 0.06 210 / 18%),
+    0 18px 40px oklch(0.08 0.05 270 / 55%);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
 
   &::before,
   &::after {
@@ -633,7 +625,7 @@
     width: 14px;
     height: 14px;
     pointer-events: none;
-    border-color: color-mix(in oklch, var(--game-cyan) 70%, transparent);
+    border-color: color-mix(in oklch, var(--office-border) 60%, white);
   }
 
   &::before {
@@ -641,7 +633,7 @@
     left: -1px;
     border-top: 2px solid;
     border-left: 2px solid;
-    border-top-left-radius: var(--radius-xl);
+    border-top-left-radius: 1rem;
   }
 
   &::after {
@@ -649,57 +641,91 @@
     right: -1px;
     border-bottom: 2px solid;
     border-right: 2px solid;
-    border-bottom-right-radius: var(--radius-xl);
+    border-bottom-right-radius: 1rem;
   }
 }
 
-/* Pusat komando: panel hero (profil komandan, identitas agent). */
-@utility game-panel-command {
-  border: 2px solid color-mix(in oklch, var(--game-border-strong) 85%, var(--game-cyan));
-  background-image:
-    linear-gradient(160deg, color-mix(in oklch, var(--game-primary) 20%, var(--game-surface)), var(--game-surface) 62%),
-    radial-gradient(120% 60% at 0% 0%, color-mix(in oklch, var(--game-cyan) 16%, transparent), transparent 60%);
+/* Terangkat: gradien kartu HUD (.hud-card) yang lebih pekat. */
+@utility game-panel-elevated {
+  background-image: linear-gradient(160deg, #102b60, #061738 76%);
+}
+
+/* Sorotan: garis cyan + cahaya (panel utama layar). */
+@utility game-panel-holo {
+  border-color: color-mix(in oklch, var(--office-cyan) 60%, white 10%);
   box-shadow:
-    inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 25%, transparent),
-    0 0 0 3px color-mix(in oklch, var(--game-primary) 10%, transparent),
-    var(--shadow-elevated);
+    0 0 0 1px oklch(0.2 0.08 265 / 70%),
+    0 0 22px oklch(0.8 0.14 215 / 28%),
+    inset 0 1px 0 oklch(0.95 0.06 210 / 22%),
+    0 18px 40px oklch(0.08 0.05 270 / 55%);
+
+  &::before,
+  &::after {
+    border-color: color-mix(in oklch, var(--office-cyan) 85%, white);
+  }
+}
+
+/* Pusat komando (hero) = kartu komandan HUD: bingkai ganda + tepi 3D. */
+@utility game-panel-command {
+  border: 1px solid #658cdb8a;
+  border-radius: 14px;
+  background-image:
+    linear-gradient(160deg, #102b60, #061738 76%),
+    radial-gradient(120% 60% at 0% 0%, oklch(0.8 0.14 215 / 14%), transparent 60%);
+  box-shadow:
+    inset 0 0 0 3px #1d3a675c,
+    0 3px 0 #03102b8c,
+    0 18px 40px oklch(0.08 0.05 270 / 55%);
+
+  &::before,
+  &::after {
+    content: none;
+  }
 }
 
 @utility game-panel-warning {
-  border-color: color-mix(in oklch, var(--game-orange) 55%, transparent);
-  background-image: linear-gradient(
-    160deg,
-    color-mix(in oklch, var(--game-orange) 12%, var(--game-surface)),
-    var(--game-surface) 70%
-  );
+  border-color: color-mix(in oklch, var(--office-orange) 60%, transparent);
+
+  &::before,
+  &::after {
+    border-color: color-mix(in oklch, var(--office-orange) 80%, white);
+  }
 }
 
 @utility game-panel-success {
-  border-color: color-mix(in oklch, var(--game-success) 50%, transparent);
-  background-image: linear-gradient(
-    160deg,
-    color-mix(in oklch, var(--game-success) 12%, var(--game-surface)),
-    var(--game-surface) 70%
-  );
+  border-color: color-mix(in oklch, var(--office-mint) 55%, transparent);
+
+  &::before,
+  &::after {
+    border-color: color-mix(in oklch, var(--office-mint) 80%, white);
+  }
 }
 
-/* Sumur: area bersarang (daftar, kode, pratinjau). */
+/* Sumur = blok kosong/entri roster (garis putus cyan, navy pekat). */
 @utility game-panel-sunken {
-  background-color: var(--surface-sunken);
+  border: 1px dashed color-mix(in oklch, var(--office-cyan) 35%, transparent);
+  border-radius: 0.75rem;
   background-image: none;
-  border: 1px solid color-mix(in oklch, var(--game-border) 70%, transparent);
+  background-color: oklch(0.16 0.05 266 / 70%);
   box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  &::before,
+  &::after {
+    content: none;
+  }
 }
 
-/* Daftar tab pusat komando: baris transparan dengan garis dasar. */
+/* Daftar tab = .hud-segment; pemicu aktif = tombol game biru. */
 @utility game-tabs {
-  gap: 0.25rem;
+  gap: 0.3rem;
   height: auto;
-  padding: 0.25rem;
+  padding: 0.3rem;
   border-radius: 0.9rem;
-  background-color: color-mix(in oklch, var(--game-bg-deep) 70%, transparent);
-  border: 1px solid var(--game-border);
-  box-shadow: inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 10%, transparent);
+  background-image: linear-gradient(180deg, oklch(0.32 0.1 262 / 70%), oklch(0.2 0.07 266 / 70%));
+  border: 1px solid oklch(0.7 0.13 230 / 30%);
+  box-shadow: inset 0 1px 0 oklch(0.95 0.06 210 / 12%);
 }
 
 @utility game-tab {
@@ -708,52 +734,43 @@
   padding: 0 0.9rem;
   border-radius: 0.65rem;
   border: 1px solid transparent;
-  font-weight: 600;
-  color: var(--game-text-muted);
+  font-weight: 700;
+  color: oklch(0.83 0.045 252);
 
   &:hover {
-    color: var(--game-text);
+    color: white;
   }
 
   &[data-state='active'] {
-    color: var(--game-cyan);
-    background-image: linear-gradient(
-      180deg,
-      color-mix(in oklch, var(--game-cyan) 16%, transparent),
-      color-mix(in oklch, var(--game-primary) 14%, transparent)
-    );
-    border-color: color-mix(in oklch, var(--game-cyan) 40%, transparent);
+    color: white;
+    border-color: #8cbbf6;
+    background-image: linear-gradient(180deg, oklch(0.66 0.2 255), oklch(0.5 0.21 262));
+    text-shadow: 0 1px 2px oklch(0.1 0.05 265 / 60%);
     box-shadow:
-      inset 0 1px 0 color-mix(in oklch, var(--game-cyan) 22%, transparent),
-      0 0 16px -6px var(--game-glow);
+      inset 0 1px 0 oklch(1 0 0 / 30%),
+      inset 0 -3px 0 oklch(0.1 0.05 265 / 35%),
+      0 6px 16px oklch(0.08 0.05 265 / 45%);
   }
 }
 
-/*
- * Crest heksagonal (identitas komandan/modul), turunan .commander-crest HUD.
- * Cincin dibuat dengan bayangan inset (border biasa ikut terpotong clip-path);
- * cahaya luar lewat pembungkus `game-crest-glow` (filter di luar klip).
- */
+/* Crest heksagonal = .commander-crest HUD. */
 @utility game-crest {
   display: grid;
+  flex-shrink: 0;
   place-items: center;
   color: white;
   font-weight: 800;
-  background: radial-gradient(
-    circle at 50% 40%,
-    color-mix(in oklch, var(--game-purple) 70%, black) 8%,
-    oklch(0.26 0.09 262) 70%
-  );
-  box-shadow: inset 0 0 0 2.5px color-mix(in oklch, var(--game-cyan) 85%, white);
-  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  background: radial-gradient(circle, #8539b5 12%, #102757 64%);
+  border: 2px solid #76f3ff;
+  clip-path: polygon(50% 0, 91% 20%, 100% 68%, 65% 100%, 21% 91%, 0 50%, 13% 13%);
 }
 
 @utility game-crest-glow {
   display: inline-grid;
-  filter: drop-shadow(0 0 10px var(--game-glow));
+  filter: drop-shadow(0 0 8px #2ae9ff);
 }
 
-/* Chip status/metrik kecil di header halaman. */
+/* Chip meta = .office-plate (papan nama HUD). */
 @utility game-chip {
   display: inline-flex;
   align-items: center;
@@ -761,11 +778,12 @@
   height: 1.75rem;
   padding: 0 0.65rem;
   border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--game-text);
-  background-color: color-mix(in oklch, var(--game-surface-raised) 80%, transparent);
-  border: 1px solid var(--game-border);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #f5f8ff;
+  background-color: color-mix(in oklch, var(--office-bg) 82%, transparent);
+  border: 1px solid color-mix(in oklch, var(--office-cyan) 30%, transparent);
+  box-shadow: 0 4px 12px oklch(0.1 0.05 262 / 55%);
 }
 
 /* Scrollbar bertema untuk area gulir di panel. */
@@ -777,6 +795,21 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+
+  /* Kontrol formulir = sumur panel perintah /office (navy pekat, garis putih 15 %, fokus cyan). */
+  [data-slot='input'],
+  [data-slot='textarea'],
+  [data-slot='select-trigger'] {
+    background-color: oklch(0.14 0.05 266 / 80%);
+    border-color: oklch(1 0 0 / 15%);
+    color: #f5f8ff;
+  }
+
+  [data-slot='input']:focus-visible,
+  [data-slot='textarea']:focus-visible,
+  [data-slot='select-trigger']:focus-visible {
+    border-color: var(--office-cyan);
   }
 
   html {

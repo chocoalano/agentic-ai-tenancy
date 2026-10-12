@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { Building2, ChevronDown, Lock, Menu } from '@lucide/vue'
+import { Building2, ChevronDown, Lock, Menu, Settings } from '@lucide/vue'
 
 /**
- * Navigasi atas bergaya HUD game untuk halaman manajemen (Agentic Game UI).
- *
- * Desktop ≥ 1280px: identitas aplikasi, tab modul yang tersedia (data
- * `NAVIGATION` — satu sumber dengan menu game & pencarian global), menu
- * "Segera" untuk modul yang belum dibangun (nonaktif, tanpa tautan palsu),
- * pemilih perusahaan, pencarian global, notifikasi, tema, menu pengguna.
- * Di bawah 1280px: tombol menu membuka GameMenu (Sheet yang sama dengan
- * /office) dan tombol cepat ke Virtual Office; strip kedua menampilkan
- * identitas area + judul halaman.
+ * Strip HUD atas halaman manajemen — pola yang sama dengan GameHUD /office:
+ * strip `hud-bar`, kartu komandan (crest perusahaan = pemilih tenant), kartu
+ * modul (`game-nav-link` = kartu HUD kecil dengan ikon bercahaya) dari
+ * `NAVIGATION`, menu "Segera" untuk modul yang belum dibangun (nonaktif,
+ * tanpa tautan palsu), lalu aksi HUD: pencarian, notifikasi, pengaturan,
+ * tombol cepat Virtual Office, menu pengguna, dan menu game (< 1280px).
  */
 const props = defineProps<{ identity?: string; title?: string; currentPath?: string }>()
 const emit = defineEmits<{ openMenu: [] }>()
@@ -23,26 +20,23 @@ const upcoming = modules.filter((item) => item.status === 'soon')
 </script>
 
 <template>
-  <header class="game-topnav sticky top-0 z-30" data-game-topnav>
-    <div class="mx-auto flex h-16 max-w-[96rem] items-center gap-2 px-3 sm:px-4 lg:px-6">
+  <header class="hud-bar sticky top-0 z-30 px-2.5 pt-1 md:px-3" data-game-topnav>
+    <div class="mx-auto flex h-14.75 max-w-384 items-center gap-2 max-md:h-13.75 max-md:gap-1">
       <Button
         variant="ghost"
         size="icon"
-        class="size-10 rounded-xl xl:hidden"
+        class="hud-icon-btn size-10 shrink-0 xl:hidden"
         aria-label="Buka menu game"
         data-game-menu-trigger
         @click="emit('openMenu')"
       >
-        <Menu class="size-5" aria-hidden="true" />
+        <Menu class="size-7" aria-hidden="true" />
       </Button>
-      <NuxtLink to="/office" class="shrink-0 rounded-xl" aria-label="Kembali ke Virtual Office">
-        <AppLogo />
-      </NuxtLink>
 
-      <nav
-        class="ml-2 hidden items-center gap-0.5 xl:flex 2xl:ml-3 2xl:gap-1 [&_a>svg]:hidden 2xl:[&_a>svg]:block"
-        aria-label="Modul"
-      >
+      <!-- Kartu komandan: perusahaan aktif (crest) + komandan; klik = ganti perusahaan -->
+      <TenantSwitcher variant="hud" />
+
+      <nav class="ml-1 hidden items-center gap-1.5 xl:flex [&_a>svg]:hidden 2xl:[&_a>svg]:block" aria-label="Modul">
         <NuxtLink
           v-for="item in available"
           :key="item.key"
@@ -52,42 +46,43 @@ const upcoming = modules.filter((item) => item.status === 'soon')
           :aria-current="isNavigationActive(item, path) ? 'page' : undefined"
           :data-nav="item.key"
         >
-          <component :is="item.icon" class="size-4" aria-hidden="true" />
+          <component :is="item.icon" class="size-4.5" aria-hidden="true" />
           {{ item.label }}
         </NuxtLink>
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <button type="button" class="game-nav-link" data-nav="upcoming">
-              <Lock class="size-4" aria-hidden="true" />
+              <Lock class="size-4.5" aria-hidden="true" />
               Segera
               <ChevronDown class="size-3.5 opacity-70" aria-hidden="true" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" class="w-72">
-            <DropdownMenuLabel class="text-xs text-muted-foreground">Area yang sedang dibangun</DropdownMenuLabel>
-            <DropdownMenuItem v-for="item in upcoming" :key="item.key" disabled class="gap-2">
+          <DropdownMenuContent align="start" class="game-panel w-72 rounded-xl">
+            <DropdownMenuLabel class="text-[10px] font-semibold uppercase tracking-[0.16em] text-office-orange"
+              >Area yang sedang dibangun</DropdownMenuLabel
+            >
+            <DropdownMenuItem v-for="item in upcoming" :key="item.key" disabled class="gap-2 text-blue-100">
               <component :is="item.icon" class="size-4" aria-hidden="true" />
               <span class="flex-1">{{ item.label }}</span>
-              <span class="text-[10px] font-medium text-muted-foreground">{{ item.release }}</span>
+              <OfficeStatusBadge tone="purple" :label="item.release ?? 'Segera'" />
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </nav>
 
-      <div class="ml-auto flex min-w-0 items-center gap-1 md:gap-1.5">
-        <div class="hidden shrink-0 md:block">
-          <TenantSwitcher variant="header" />
-        </div>
+      <div class="ml-auto flex min-w-0 shrink-0 items-center gap-0.5 md:gap-1">
         <div class="min-w-0 2xl:w-64">
           <GlobalSearch />
         </div>
         <NotificationTrigger />
-        <div class="hidden sm:block">
-          <ThemeToggle />
-        </div>
-        <Button variant="ghost" size="icon" class="size-10 rounded-xl text-game-cyan xl:hidden" as-child>
+        <Button variant="ghost" size="icon" class="hud-icon-btn hidden size-10 xl:inline-flex" as-child>
+          <NuxtLink to="/settings" aria-label="Pengaturan" data-nav="settings-quick">
+            <Settings class="size-7" aria-hidden="true" />
+          </NuxtLink>
+        </Button>
+        <Button variant="ghost" size="icon" class="hud-icon-btn size-10 xl:hidden" as-child>
           <NuxtLink to="/office" aria-label="Buka Virtual Office" data-nav="office-quick">
-            <Building2 class="size-5" aria-hidden="true" />
+            <Building2 class="size-7" aria-hidden="true" />
           </NuxtLink>
         </Button>
         <UserMenu />
@@ -95,13 +90,13 @@ const upcoming = modules.filter((item) => item.status === 'soon')
     </div>
 
     <div
-      class="mx-auto flex h-9 max-w-[96rem] items-center gap-2 border-t border-game-border/60 px-3 sm:px-4 lg:px-6 xl:hidden"
+      class="mx-auto flex h-8 max-w-384 items-center gap-2 border-t border-[#6288cb5c] text-[10px] font-semibold uppercase tracking-[0.16em] xl:hidden"
       data-game-identity-strip
     >
-      <p class="type-eyebrow truncate">{{ identity ?? 'Agentic AI Virtual Office' }}</p>
+      <p class="truncate text-office-cyan">{{ identity ?? 'Agentic AI Virtual Office' }}</p>
       <template v-if="title">
-        <span class="text-game-text-muted" aria-hidden="true">·</span>
-        <p class="truncate text-xs font-medium">{{ title }}</p>
+        <span class="text-blue-300" aria-hidden="true">·</span>
+        <p class="truncate normal-case tracking-normal text-blue-100">{{ title }}</p>
       </template>
     </div>
   </header>

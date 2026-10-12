@@ -24,7 +24,7 @@ import {
  * AI employee yang dikarang di sini: nama Nova/Sage/Pixel/Bolt/Echo adalah
  * nama karakter asset pack, bukan agent.
  */
-definePageMeta({ layout: 'app', middleware: 'auth', title: 'Galeri Aset Game' })
+definePageMeta({ layout: 'app', middleware: 'auth', title: 'Galeri Aset Game', colorMode: 'dark' })
 useHead({ title: 'Galeri Aset Game' })
 
 const uiPreviews = Object.entries(UI_PREVIEWS)

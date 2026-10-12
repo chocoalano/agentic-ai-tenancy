@@ -3,9 +3,9 @@ import { ArrowLeft } from '@lucide/vue'
 import type { Component } from 'vue'
 
 /**
- * Header halaman Agentic Game UI: crest ikon, identitas area (eyebrow, mis.
- * "Commander Control Center"), judul (h1), deskripsi, chip meta (slot `meta`),
- * aksi (slot `actions`), dan tautan kembali opsional.
+ * Header halaman = kartu panel HUD dengan kepala `hud-heading` (pola panel
+ * misi/roster /office): crest ikon, identitas area (uppercase cyan), judul
+ * h1, aksi di kanan; baris kedua: deskripsi + chip meta.
  */
 withDefaults(
   defineProps<{
@@ -21,32 +21,40 @@ withDefaults(
 </script>
 
 <template>
-  <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between" data-game-page-header>
-    <div class="flex min-w-0 items-start gap-4">
-      <span v-if="icon" class="game-crest-glow mt-1 hidden shrink-0 sm:inline-grid" aria-hidden="true">
-        <span class="game-crest size-14">
-          <component :is="icon" class="size-6" />
+  <header class="game-panel overflow-hidden" data-game-page-header>
+    <div class="hud-heading flex-wrap gap-y-2">
+      <span v-if="icon" class="game-crest-glow shrink-0" aria-hidden="true">
+        <span class="game-crest size-11">
+          <component :is="icon" class="size-5" />
         </span>
       </span>
-      <div class="min-w-0 space-y-1.5">
+      <div class="min-w-0 flex-1">
         <NuxtLink
           v-if="backTo"
           :to="backTo"
-          class="type-label inline-flex items-center gap-1 rounded-md transition-colors hover:text-foreground"
+          class="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-200 hover:text-office-cyan"
         >
           <ArrowLeft class="size-3.5" aria-hidden="true" />
           {{ backLabel }}
         </NuxtLink>
-        <p v-if="identity" class="type-eyebrow" data-game-identity>{{ identity }}</p>
-        <h1 class="type-page-title">{{ title }}</h1>
-        <p v-if="description" class="type-support max-w-3xl">{{ description }}</p>
-        <div v-if="$slots.meta" class="flex flex-wrap items-center gap-2 pt-1">
-          <slot name="meta" />
-        </div>
+        <p
+          v-if="identity"
+          class="text-[10px] font-semibold uppercase tracking-[0.16em] text-office-cyan"
+          data-game-identity
+        >
+          {{ identity }}
+        </p>
+        <h1 class="wrap-break-word font-heading text-xl font-bold leading-tight md:text-2xl">{{ title }}</h1>
+      </div>
+      <div v-if="$slots.actions" class="flex basis-full flex-wrap items-center gap-2 sm:basis-auto sm:shrink-0">
+        <slot name="actions" />
       </div>
     </div>
-    <div v-if="$slots.actions" class="flex shrink-0 flex-wrap items-center gap-2">
-      <slot name="actions" />
+    <div v-if="description || $slots.meta" class="px-4 py-3">
+      <p v-if="description" class="text-[14px] leading-[1.45] text-blue-100">{{ description }}</p>
+      <div v-if="$slots.meta" :class="['flex flex-wrap items-center gap-2', description ? 'mt-2.5' : '']">
+        <slot name="meta" />
+      </div>
     </div>
   </header>
 </template>

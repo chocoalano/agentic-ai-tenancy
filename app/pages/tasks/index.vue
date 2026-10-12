@@ -7,7 +7,7 @@ import { TASK_STATUSES, type TaskStatus } from '~~/domains/tasks/types'
  * otoritatif dari backend, bertahan setelah refresh/login ulang). Hanya tugas
  * tenant aktif yang pernah dikembalikan API (RLS).
  */
-definePageMeta({ layout: 'app', middleware: 'auth', title: 'Tugas' })
+definePageMeta({ layout: 'app', middleware: 'auth', title: 'Tugas', colorMode: 'dark' })
 useHead({ title: 'Tugas' })
 
 const { $api } = useNuxtApp()
@@ -135,7 +135,7 @@ const formatter = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeSt
       <li v-for="task in filtered" :key="task.id">
         <NuxtLink
           :to="`/tasks/${task.id}`"
-          class="game-panel flex flex-col gap-2 p-4 transition hover:game-panel-holo sm:flex-row sm:items-center sm:justify-between"
+          class="hud-row flex flex-col gap-2 p-4 text-[#f5f8ff] sm:flex-row sm:items-center sm:justify-between"
           :data-task-id="task.id"
         >
           <div class="min-w-0">

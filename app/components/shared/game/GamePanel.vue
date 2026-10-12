@@ -2,17 +2,13 @@
 import type { Component } from 'vue'
 
 /**
- * Panel Agentic Game UI — pengganti kartu putih generik. Varian:
- * - default   : permukaan game + garis tepi tipis (konten umum)
- * - elevated  : permukaan terangkat (ringkasan, rail samping)
- * - holo      : garis cyan + aksen sudut (konten utama/sorotan)
- * - command   : hero pusat komando (profil komandan, identitas agent)
- * - warning   : perhatian (persetujuan tertunda, runtime belum siap)
- * - success   : hasil/selesai
- * - sunken    : sumur bersarang (daftar, kode, pratinjau)
+ * Panel HUD (pola yang sama persis dengan panel misi/roster /office):
+ * bingkai `hud-panel`, kepala `hud-heading` (ikon cyan bercahaya, judul tebal,
+ * keterangan kecil, aksi di kanan), isi `text-blue-100`, kaki bergaris.
  *
- * Header opsional lewat prop `title`/`description`/`icon`/`eyebrow` atau slot
- * `header`; slot `actions` di kanan header; slot `footer` di bawah.
+ * Varian: default (hud-panel) · elevated (gradien kartu HUD) · holo (garis
+ * cyan bercahaya, satu per layar) · command (kartu komandan: bingkai ganda +
+ * tepi 3D) · warning (oranye) · success (mint) · sunken (sumur putus-putus).
  */
 type PanelVariant = 'default' | 'elevated' | 'holo' | 'command' | 'warning' | 'success' | 'sunken'
 type PanelPadding = 'none' | 'sm' | 'md' | 'lg'
@@ -53,42 +49,45 @@ const VARIANT: Record<PanelVariant, string> = {
 }
 const PADDING: Record<PanelPadding, string> = {
   none: '',
-  sm: 'p-3 sm:p-4',
-  md: 'p-4 sm:p-5',
-  lg: 'p-5 sm:p-7',
+  sm: 'px-3 py-3',
+  md: 'px-4 py-3.5',
+  lg: 'px-5 py-5 sm:px-6',
 }
 </script>
 
 <template>
   <component
     :is="as"
-    :class="['game-panel', VARIANT[variant], PADDING[padding]]"
+    :class="['game-panel overflow-hidden', VARIANT[variant]]"
     :data-game-panel="variant"
     :aria-labelledby="headingId"
   >
-    <div v-if="title || $slots.header" class="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div v-if="title || $slots.header" class="hud-heading">
       <slot name="header">
-        <div class="flex min-w-0 items-start gap-3">
-          <span
-            v-if="icon"
-            class="mt-0.5 grid size-9 shrink-0 place-items-center rounded-lg bg-game-cyan/12 text-game-cyan ring-1 ring-inset ring-game-cyan/25"
-            aria-hidden="true"
-          >
-            <component :is="icon" class="size-4" />
-          </span>
-          <div class="min-w-0 space-y-0.5">
-            <p v-if="eyebrow" class="type-eyebrow">{{ eyebrow }}</p>
-            <component :is="headingLevel" :id="headingId" class="type-section-title">{{ title }}</component>
-            <p v-if="description" class="type-support">{{ description }}</p>
-          </div>
+        <component
+          :is="icon"
+          v-if="icon"
+          class="size-7 shrink-0 text-office-cyan drop-shadow-[0_0_6px_var(--office-cyan)]"
+          aria-hidden="true"
+        />
+        <div class="min-w-0 flex-1">
+          <p v-if="eyebrow" class="text-[9px] font-semibold uppercase tracking-[0.16em] text-office-orange">
+            {{ eyebrow }}
+          </p>
+          <component :is="headingLevel" :id="headingId" class="font-heading text-lg font-bold leading-tight">{{
+            title
+          }}</component>
+          <p v-if="description" class="text-[11px] font-semibold tracking-wide text-blue-200/85">{{ description }}</p>
         </div>
       </slot>
       <div v-if="$slots.actions" class="flex shrink-0 items-center gap-2">
         <slot name="actions" />
       </div>
     </div>
-    <slot />
-    <div v-if="$slots.footer" class="mt-4 flex flex-wrap items-center gap-2 border-t border-game-border/70 pt-4">
+    <div v-if="$slots.default" :class="['text-[14px] leading-[1.45] text-blue-100', PADDING[padding]]">
+      <slot />
+    </div>
+    <div v-if="$slots.footer" class="flex flex-wrap items-center gap-2 border-t border-[#6288cb5c] px-4 py-3">
       <slot name="footer" />
     </div>
   </component>

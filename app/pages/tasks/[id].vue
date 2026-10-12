@@ -8,7 +8,7 @@ import { ACTIVE_TENANT_HEADER } from '~~/domains/tenancy/headers'
  * /tasks/:id — detail misi (tugas nyata): run per percobaan, hasil model
  * (teks, dirender aman tanpa HTML), persetujuan tertunda, pembatalan.
  */
-definePageMeta({ layout: 'app', middleware: 'auth', title: 'Detail Tugas' })
+definePageMeta({ layout: 'app', middleware: 'auth', title: 'Detail Tugas', colorMode: 'dark' })
 
 const route = useRoute()
 const { $api } = useNuxtApp()

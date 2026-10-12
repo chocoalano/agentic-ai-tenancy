@@ -7,7 +7,7 @@ import { AGENT_LIFECYCLE_STATUSES, type AgentLifecycleStatus } from '~~/domains/
  * (database, RLS). Angka ringkasan dihitung dari data yang sama; tidak ada
  * robot demo yang dirender sebagai karyawan nyata.
  */
-definePageMeta({ layout: 'app', middleware: 'auth', title: 'AI Employees' })
+definePageMeta({ layout: 'app', middleware: 'auth', title: 'AI Employees', colorMode: 'dark' })
 useHead({ title: 'AI Employees' })
 
 const { $api } = useNuxtApp()
