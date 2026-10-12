@@ -28,6 +28,8 @@ let taskA = ''
 let runA = ''
 let contextA: Awaited<ReturnType<typeof ownerContext>>
 let contextB: Awaited<ReturnType<typeof ownerContext>>
+/** Id outbox terakhir sebelum tugas A dibuat — outbox bersama tumbuh lintas run test. */
+let outboxSince = 0
 
 beforeAll(async () => {
   const a = await registerOwner(app, 'tiso-a', 'Isolasi Tugas A')
@@ -38,6 +40,8 @@ beforeAll(async () => {
   contextB = await ownerContext(app, b.userId, tenantB)
   agentA = (await addAgents(app, contextA, [{ name: 'Iso Agent A' }]))[0] ?? ''
   agentB = (await addAgents(app, contextB, [{ name: 'Iso Agent B' }]))[0] ?? ''
+  const [latest] = await app.sql<{ id: number | string }[]>`select app.realtime_outbox_latest_id() as id`
+  outboxSince = Number(latest?.id ?? 0)
   const created = await a.api.v1.tasks.post({ agentId: agentA, instruction: 'Rahasia A', requiresApproval: true })
   taskA = created.data?.task.id ?? ''
   runA = created.data?.task.latestRun?.id ?? ''
@@ -163,7 +167,7 @@ describe('RLS tabel tugas', () => {
     expect(outboxDirect).toHaveLength(0)
     const viaFunction = await app.sql<
       { id: number | string; tenant_id: string }[]
-    >`select id, tenant_id from app.realtime_outbox_after(0, 1000)`
+    >`select id, tenant_id from app.realtime_outbox_after(${outboxSince}, 1000)`
     expect(viaFunction.some((row) => row.tenant_id === tenantA)).toBe(true)
     const [claim] = await app.sql<
       { run_id: string; tenant_id: string }[]
